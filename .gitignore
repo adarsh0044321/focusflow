@@ -65,3 +65,9 @@ llama.cpp-master/
 Tesseract-OCR/
 svchost.exe
 FocusFlow-Publisher.cer
+
+# Built packages and spec files
+FocusFlow-v1.0.0-FullRelease.zip
+FocusFlow-v1.0.0-FullRelease.zip.*
+FocusFlow-v1.0.0-LITE.zip
+FocusFlow.spec

@@ -29,7 +29,11 @@ from typing import Optional
 # Resolve base directory (where this script lives)
 # ---------------------------------------------------------------------------
 if getattr(sys, "frozen", False):
-    BASE_DIR = Path(sys.executable).resolve().parent
+    exe_dir = Path(sys.executable).resolve().parent
+    if exe_dir.name.lower() == "dist" and not (exe_dir / "Tesseract-OCR").exists() and (exe_dir.parent / "Tesseract-OCR").exists():
+        BASE_DIR = exe_dir.parent
+    else:
+        BASE_DIR = exe_dir
 else:
     BASE_DIR = Path(__file__).resolve().parent
 
