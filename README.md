@@ -61,21 +61,49 @@ graph TD
 
 ## 🚀 Setup & Installation
 
-### Prerequisites
-- **OS**: Windows 10 (Build 2004+) or Windows 11.
-- **Python**: 3.9 or higher.
-- **Tesseract OCR**: Bundled in `C:\studytool\Tesseract-OCR\tesseract.exe`.
+### Option A: Standalone Executable (Recommended)
+No Python installation or dependency setup is required. 
 
-### 1. Install Python Dependencies
-Open PowerShell and install the required modules:
-```powershell
-pip install -r requirements.txt
-```
+1. **Choose & Download a Release Package**:
+   - **Lite Release (`FocusFlow-v1.0.0-LITE.zip`)** [~77 MB]: Contains the precompiled standalone executable, local knowledge base, and the Tesseract OCR engine. Best if you plan to use **Online Mode** (OpenAI API) or want to download GGUF models separately.
+   - **Full Release (`FocusFlow-v1.0.0-FullRelease.zip`)** [~2.4 GB]: Complete offline bundle. Includes all items in Lite plus the local `Phi-3-mini` GGUF model weights for complete **Offline Mode** solving. Split into three downloadable parts (`.zip.001`, `.zip.002`, `.zip.003`).
 
-### 2. Configure Settings
-Launch the application and press **`Ctrl+Shift+S`** (or select the settings button) to open the HUD config drawer:
-- **Online Setup**: Enter your API key(s) in the field and click **Add**. The keys will rotate automatically.
-- **Offline Setup**: Configure your CPU threads, GPU layers, and GGUF model path.
+2. **Extraction**:
+   - **Lite**: Extract `FocusFlow-v1.0.0-LITE.zip` to your chosen directory.
+   - **Full**: Download all three split parts into the same folder. Right-click the `.001` file and use a utility like **7-Zip** or **WinRAR** to extract the unified `FocusFlow-Release/` folder.
+
+3. **Run FocusFlow**:
+   - Open the extracted `FocusFlow-Release/` folder.
+   - Launch `FocusFlow.exe`. The app starts silently in the background and sets up the stealth HUD panel.
+
+---
+
+### Option B: Running from Source (Developer Setup)
+
+#### Prerequisites
+- **OS**: Windows 10/11
+- **Python**: Version 3.9 or higher
+- **Tesseract OCR**: Placed at `Tesseract-OCR/tesseract.exe` relative to the workspace.
+
+1. **Install Python Dependencies**:
+   Open a terminal in the root project folder and install python dependencies:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+
+2. **Run Application**:
+   Start the application entry point:
+   ```powershell
+   python main.py
+   ```
+
+---
+
+### ⚙️ Initial Configuration
+Once the application is running (from executable or source), configure the settings drawer:
+1. Press **`Ctrl+Shift+S`** (or click the settings gear icon on the Control Panel) to open the Config panel.
+2. **For Online Mode**: Enter one or more OpenAI API keys in the online API key field and click **Add**. FocusFlow will rotate keys automatically if one hits rate limits or quota issues.
+3. **For Offline Mode**: Ensure the local GGUF model file is placed in `models/` and matches the path configured in Settings (defaults to `models/Phi-3-mini-4k-instruct-q4.gguf`).
 
 ---
 
