@@ -28,7 +28,10 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 # Resolve base directory (where this script lives)
 # ---------------------------------------------------------------------------
-BASE_DIR = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
 
 # ---------------------------------------------------------------------------
 # Logging setup
