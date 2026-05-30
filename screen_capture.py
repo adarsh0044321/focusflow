@@ -88,6 +88,8 @@ class ScreenCapture:
     def select_region_interactive(
         self,
         callback: Callable[[int, int, int, int], None],
+        on_cancel: Optional[Callable[[], None]] = None,
+        root: Optional[tk.Misc] = None,
     ) -> None:
         """Open a translucent fullscreen overlay and let the user
         click-and-drag to select a rectangular region.
@@ -99,7 +101,7 @@ class ScreenCapture:
         calling the callback.
         """
         self.logger.info("Opening interactive region selector …")
-        _RegionSelector(callback, self.logger)
+        _RegionSelector(callback, self.logger, root=root, on_cancel=on_cancel)
 
 
 # ======================================================================
@@ -120,16 +122,23 @@ class _RegionSelector:
         self,
         callback: Callable[[int, int, int, int], None],
         log: logging.Logger,
+        root: Optional[tk.Misc] = None,
+        on_cancel: Optional[Callable[[], None]] = None,
     ) -> None:
         self._callback = callback
+        self._on_cancel_callback = on_cancel
         self._logger = log
         self._start_x: int = 0
         self._start_y: int = 0
         self._rect_id: Optional[int] = None
 
         # --- build the overlay window -----------------------------------
-        self._root = tk.Tk()
-        self._root.withdraw()  # hide default root
+        self._root_passed = root is not None
+        if root is not None:
+            self._root = root
+        else:
+            self._root = tk.Tk()
+            self._root.withdraw()  # hide default root
 
         self._overlay = tk.Toplevel(self._root)
         self._overlay.title("Select Region")
@@ -166,7 +175,10 @@ class _RegionSelector:
         self._canvas.bind("<ButtonRelease-1>", self._on_release)
         self._overlay.bind("<Escape>", self._on_cancel)
 
-        self._root.mainloop()
+        if self._root_passed:
+            self._root.wait_window(self._overlay)
+        else:
+            self._root.mainloop()
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -209,6 +221,11 @@ class _RegionSelector:
             self._logger.warning(
                 "Region too small (%d×%d) – selection ignored.", w, h
             )
+            if self._on_cancel_callback:
+                try:
+                    self._on_cancel_callback()
+                except Exception:
+                    pass
             return
 
         self._logger.info("Region selected: x=%d y=%d w=%d h=%d", x, y, w, h)
@@ -220,6 +237,11 @@ class _RegionSelector:
     def _on_cancel(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
         self._logger.info("Region selection cancelled by user.")
         self._destroy()
+        if self._on_cancel_callback:
+            try:
+                self._on_cancel_callback()
+            except Exception:
+                self._logger.exception("Error in cancel callback")
 
     # ------------------------------------------------------------------
     # Helpers
@@ -230,7 +252,8 @@ class _RegionSelector:
             self._overlay.destroy()
         except tk.TclError:
             pass
-        try:
-            self._root.destroy()
-        except tk.TclError:
-            pass
+        if not self._root_passed:
+            try:
+                self._root.destroy()
+            except tk.TclError:
+                pass

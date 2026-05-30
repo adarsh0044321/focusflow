@@ -149,6 +149,19 @@ class ConfigManager:
             self.save()
         logger.debug("Setting changed  %s: %r -> %r", key, old, value)
 
+    def batch_update(self, updates: dict[str, Any]) -> None:
+        """Update multiple settings in a single batch and save once."""
+        with self._lock:
+            changed = False
+            for key, value in updates.items():
+                old = self._settings.get(key)
+                if old != value:
+                    self._settings[key] = value
+                    changed = True
+                    logger.debug("Setting changed (batch) %s: %r -> %r", key, old, value)
+            if changed:
+                self.save()
+
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
@@ -157,21 +170,29 @@ class ConfigManager:
         """Write the current settings to ``data/settings.json``.
 
         The parent directory is created automatically if it does not exist.
-        A temporary file is written first and then renamed to avoid
+        A temporary file is written first and then replaced to avoid
         corruption on power loss.
         """
         with self._lock:
             try:
                 self._settings_path.parent.mkdir(parents=True, exist_ok=True)
 
+                # Create a backup of the existing settings before overwrite
+                if self._settings_path.exists():
+                    bak_path = self._settings_path.with_suffix(".json.bak")
+                    try:
+                        import shutil
+                        shutil.copy2(str(self._settings_path), str(bak_path))
+                    except Exception as e:
+                        logger.warning("Failed to create settings backup: %s", e)
+
                 tmp_path = self._settings_path.with_suffix(".tmp")
                 with open(tmp_path, "w", encoding="utf-8") as fh:
                     json.dump(self._settings, fh, indent=2, ensure_ascii=False)
 
-                # Atomic-ish rename (Windows replaces existing target).
-                if self._settings_path.exists():
-                    self._settings_path.unlink()
-                tmp_path.rename(self._settings_path)
+                # Atomic replacement on Windows & Unix
+                import os as _os
+                _os.replace(str(tmp_path), str(self._settings_path))
 
                 logger.debug("Settings saved  %s", self._settings_path)
             except OSError as exc:
@@ -185,6 +206,7 @@ class ConfigManager:
         """
         with self._lock:
             merged: dict[str, Any] = dict(DEFAULTS)
+            loaded = False
 
             if self._settings_path.is_file():
                 try:
@@ -192,6 +214,7 @@ class ConfigManager:
                         stored = json.load(fh)
                     if isinstance(stored, dict):
                         merged.update(stored)
+                        loaded = True
                         logger.info("Settings loaded  %s", self._settings_path)
                     else:
                         logger.warning(
@@ -199,9 +222,23 @@ class ConfigManager:
                         )
                 except (json.JSONDecodeError, OSError) as exc:
                     logger.error(
-                        "Error reading settings (%s) – using defaults", exc
+                        "Error reading settings (%s) – trying backup settings.json.bak", exc
                     )
-            else:
+                    bak_path = self._settings_path.with_suffix(".json.bak")
+                    if bak_path.is_file():
+                        try:
+                            with open(bak_path, "r", encoding="utf-8") as fh:
+                                stored = json.load(fh)
+                            if isinstance(stored, dict):
+                                merged.update(stored)
+                                loaded = True
+                                logger.info("Settings loaded from backup %s", bak_path)
+                            else:
+                                logger.warning("Backup settings file is not a JSON object")
+                        except Exception as bak_exc:
+                            logger.error("Error reading backup settings (%s)", bak_exc)
+
+            if not loaded and not self._settings_path.is_file():
                 logger.info(
                     "No settings file found at %s – using defaults",
                     self._settings_path,

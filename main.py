@@ -16,7 +16,9 @@ Features:
 - Global hotkeys
 """
 
+import atexit
 import logging
+import logging.handlers
 import os
 import sys
 import threading
@@ -49,7 +51,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-7s %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
-        logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        logging.handlers.RotatingFileHandler(
+            LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+        ),
         logging.StreamHandler(sys.stdout),
     ],
 )
@@ -88,10 +92,16 @@ class FocusFlowApp:
         self.capture = ScreenCapture(self.config)
         self.ai = AIEngine(self.config, self.kb)
         self.guard = CaptureGuard()
+        self._solving = threading.Lock()
+        self._ai_init_lock = threading.Lock()
+        self._settings_dialog = None
 
         # ── Tkinter root ─────────────────────────────────────────────
         self.root = tk.Tk()
         self.root.withdraw()  # hide root — we use Toplevel panels
+
+        # ── Process cleanup on exit ──────────────────────────────────
+        atexit.register(self.cleanup)
 
         # ── Create UI panels ─────────────────────────────────────────
         self._create_panels()
@@ -146,7 +156,6 @@ class FocusFlowApp:
         panel_h = 500
 
         # Pipeline panel (left)
-        self.pipeline = PipelinePanel(self.root)
         self.pipeline_win = tk.Toplevel(self.root)
         self.pipeline_win.overrideredirect(True)
         self.pipeline_win.attributes("-topmost", True)
@@ -210,39 +219,45 @@ class FocusFlowApp:
 
     def _init_ai(self) -> None:
         """Start the AI engine (runs in background thread)."""
-        mode = self.config.get("mode") or "combined"
-        if mode == "online":
-            self._update_llm_status("Online Mode Active", True)
-            self.pipeline.log("LLM: Online mode active.")
+        if not self._ai_init_lock.acquire(blocking=False):
+            logger.warning("[AI] AI initialization already in progress")
             return
-
-        self.pipeline.log("LLM: Starting AI engine...")
-        self._update_llm_status("Loading model... (may take 30-60s on low-RAM PC)", False)
-
-        self.ai.start()
-
-        # Poll for readiness
-        max_wait = int(self.config.get("llm_timeout", 300))
-        elapsed = 0
-        while elapsed < max_wait:
-            if self.config.get("mode") == "online":
+        try:
+            mode = self.config.get("mode") or "combined"
+            if mode == "online":
                 self._update_llm_status("Online Mode Active", True)
-                self.pipeline.log("LLM: Switched to online mode. Stopping loader.")
-                self.ai.stop()
+                self._log_safe("LLM: Online mode active.")
                 return
 
-            if self.ai.offline.is_ready():
-                self._update_llm_status("LLM: Model loaded and ready!", True)
-                self.pipeline.log("LLM: Model loaded and ready!")
-                return
-            time.sleep(2)
-            elapsed += 2
-            status = self.ai.offline.status_message()
-            self._update_llm_status(status, False)
-            self.pipeline.log(f"LLM: {status}")
+            self._log_safe("LLM: Starting AI engine...")
+            self._update_llm_status("Loading model... (may take 30-60s on low-RAM PC)", False)
 
-        self._update_llm_status("LLM: Timeout waiting for model", False)
-        self.pipeline.log("LLM: Timeout — model may not have loaded.")
+            self.ai.start()
+
+            # Poll for readiness
+            max_wait = int(self.config.get("llm_timeout", 300))
+            elapsed = 0
+            while elapsed < max_wait:
+                if self.config.get("mode") == "online":
+                    self._update_llm_status("Online Mode Active", True)
+                    self._log_safe("LLM: Switched to online mode. Stopping loader.")
+                    self.ai.stop()
+                    return
+
+                if self.ai.offline.is_ready():
+                    self._update_llm_status("LLM: Model loaded and ready!", True)
+                    self._log_safe("LLM: Model loaded and ready!")
+                    return
+                time.sleep(2)
+                elapsed += 2
+                status = self.ai.offline.status_message()
+                self._update_llm_status(status, False)
+                self._log_safe(f"LLM: {status}")
+
+            self._update_llm_status("LLM: Timeout waiting for model", False)
+            self._log_safe("LLM: Timeout — model may not have loaded.")
+        finally:
+            self._ai_init_lock.release()
 
     def _update_llm_status(self, message: str, ready: bool) -> None:
         """Thread-safe LLM status update."""
@@ -314,6 +329,9 @@ class FocusFlowApp:
 
     def _on_solve(self) -> None:
         """Capture screen, OCR, and solve with AI."""
+        if not self._solving.acquire(blocking=False):
+            logger.warning("[Solve] Skip solve — already in progress")
+            return
         self.pipeline.log("\n--- Solving ---")
         self.answer.set_system_message("[System] Capturing screen...")
 
@@ -322,83 +340,89 @@ class FocusFlowApp:
 
     def _solve_pipeline(self) -> None:
         """Full solve pipeline (runs in background thread)."""
-        t_start = time.perf_counter()
-
-        # 1. Capture
         try:
-            image = self.capture.capture()
-            self.pipeline.log(f"[Capture] {image.size[0]}x{image.size[1]} captured")
+            t_start = time.perf_counter()
+
+            # 1. Capture
+            try:
+                image = self.capture.capture()
+                self._log_safe(f"[Capture] {image.size[0]}x{image.size[1]} captured")
+            except Exception as e:
+                self._log_safe(f"[Capture] Error: {e}")
+                self._set_answer_safe(f"[Error] Screen capture failed: {e}")
+                return
+
+            # 2. Save screenshot if enabled
+            if self.config.get("save_screenshot_history"):
+                timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+                self.history.save_screenshot(image, timestamp)
+
+            # 3. OCR
+            t_ocr = time.perf_counter()
+            raw_text, ocr_err = self.ocr.extract_text(image)
+            ocr_duration = round(time.perf_counter() - t_ocr, 2)
+
+            if ocr_err:
+                self._log_safe(f"[OCR] Warning: {ocr_err}")
+            self._log_safe(f"[OCR] Extracted {len(raw_text)} chars in {ocr_duration}s")
+
+            # 4. Clean OCR
+            cleaned_text, quality, warnings = self.cleaner.clean(raw_text)
+            self._log_safe(
+                f"[OCRCleaner] raw={len(raw_text)} chars -> cleaned={len(cleaned_text)} chars, quality={quality}"
+            )
+            for w in warnings:
+                self._log_safe(f"[OCRCleaner] Warning: {w}")
+
+            if not cleaned_text.strip():
+                self._set_answer_safe("[No text detected] Try adjusting the capture region.")
+                return
+
+            # 5. AI Solve
+            self._set_system_safe("[System] Sending to AI...")
+            t_llm = time.perf_counter()
+
+            mode = self.config.get("mode", "combined")
+            send_mode = self.config.get("online_send_mode", "ocr")
+
+            # Determine if we should send image
+            send_image = None
+            effective_mode = self.ai._effective_mode()
+            if effective_mode == "online" and send_mode in ("image", "both"):
+                send_image = image
+
+            result = self.ai.solve(cleaned_text, image=send_image)
+            llm_duration = round(time.perf_counter() - t_llm, 2)
+
+            answer = result.get("answer", "[No answer]")
+            engine = result.get("engine", "unknown")
+
+            self._log_safe(f"[AI] Answer in {llm_duration}s via {engine} ({len(answer)} chars)")
+            self._set_answer_safe(answer)
+
+            # 6. Save to history
+            entry = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "raw_ocr": raw_text,
+                "cleaned_ocr": cleaned_text,
+                "answer": answer,
+                "ocr_quality": quality,
+                "ocr_warnings": warnings,
+                "ocr_duration_s": ocr_duration,
+                "llm_duration_s": llm_duration,
+                "answer_mode": self.config.get("answer_mode"),
+                "capture_mode": self.config.get("capture_mode"),
+                "mode": effective_mode,
+            }
+            self.history.add_entry(entry)
+
+            total = round(time.perf_counter() - t_start, 2)
+            self._log_safe(f"[Done] Total: {total}s")
         except Exception as e:
-            self.pipeline.log(f"[Capture] Error: {e}")
-            self._set_answer_safe(f"[Error] Screen capture failed: {e}")
-            return
-
-        # 2. Save screenshot if enabled
-        if self.config.get("save_screenshot_history"):
-            timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-            self.history.save_screenshot(image, timestamp)
-
-        # 3. OCR
-        t_ocr = time.perf_counter()
-        raw_text, ocr_err = self.ocr.extract_text(image)
-        ocr_duration = round(time.perf_counter() - t_ocr, 2)
-
-        if ocr_err:
-            self.pipeline.log(f"[OCR] Warning: {ocr_err}")
-        self.pipeline.log(f"[OCR] Extracted {len(raw_text)} chars in {ocr_duration}s")
-
-        # 4. Clean OCR
-        cleaned_text, quality, warnings = self.cleaner.clean(raw_text)
-        self.pipeline.log(
-            f"[OCRCleaner] raw={len(raw_text)} chars -> cleaned={len(cleaned_text)} chars, quality={quality}"
-        )
-        for w in warnings:
-            self.pipeline.log(f"[OCRCleaner] Warning: {w}")
-
-        if not cleaned_text.strip():
-            self._set_answer_safe("[No text detected] Try adjusting the capture region.")
-            return
-
-        # 5. AI Solve
-        self._set_system_safe("[System] Sending to AI...")
-        t_llm = time.perf_counter()
-
-        mode = self.config.get("mode", "combined")
-        send_mode = self.config.get("online_send_mode", "ocr")
-
-        # Determine if we should send image
-        send_image = None
-        effective_mode = self.ai._effective_mode()
-        if effective_mode == "online" and send_mode in ("image", "both"):
-            send_image = image
-
-        result = self.ai.solve(cleaned_text, image=send_image)
-        llm_duration = round(time.perf_counter() - t_llm, 2)
-
-        answer = result.get("answer", "[No answer]")
-        engine = result.get("engine", "unknown")
-
-        self.pipeline.log(f"[AI] Answer in {llm_duration}s via {engine} ({len(answer)} chars)")
-        self._set_answer_safe(answer)
-
-        # 6. Save to history
-        entry = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "raw_ocr": raw_text,
-            "cleaned_ocr": cleaned_text,
-            "answer": answer,
-            "ocr_quality": quality,
-            "ocr_warnings": warnings,
-            "ocr_duration_s": ocr_duration,
-            "llm_duration_s": llm_duration,
-            "answer_mode": self.config.get("answer_mode"),
-            "capture_mode": self.config.get("capture_mode"),
-            "mode": effective_mode,
-        }
-        self.history.add_entry(entry)
-
-        total = round(time.perf_counter() - t_start, 2)
-        self.pipeline.log(f"[Done] Total: {total}s")
+            logger.error(f"[Solve] Pipeline crashed: {e}")
+            self._set_answer_safe(f"[Error] Pipeline crashed: {e}")
+        finally:
+            self._solving.release()
 
     def _on_manual_question(self) -> None:
         """Handle Manual Q button on Answer Panel (shows dialog)."""
@@ -420,28 +444,32 @@ class FocusFlowApp:
         self.answer.set_system_message("[System] Processing manual question...")
 
         def _solve():
-            result = self.ai.solve_manual(question.strip())
-            answer = result.get("answer", "[No answer]")
-            engine = result.get("engine", "unknown")
-            duration = result.get("duration", 0)
-            self.pipeline.log(f"[AI] Manual answer in {duration}s via {engine}")
-            self._set_answer_safe(answer)
+            try:
+                result = self.ai.solve_manual(question.strip())
+                answer = result.get("answer", "[No answer]")
+                engine = result.get("engine", "unknown")
+                duration = result.get("duration", 0)
+                self._log_safe(f"[AI] Manual answer in {duration}s via {engine}")
+                self._set_answer_safe(answer)
 
-            # Save to history
-            entry = {
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "raw_ocr": question,
-                "cleaned_ocr": question,
-                "answer": answer,
-                "ocr_quality": "manual",
-                "ocr_warnings": [],
-                "ocr_duration_s": 0,
-                "llm_duration_s": duration,
-                "answer_mode": self.config.get("answer_mode"),
-                "capture_mode": "manual",
-                "mode": result.get("mode", "offline"),
-            }
-            self.history.add_entry(entry)
+                # Save to history
+                entry = {
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "raw_ocr": question,
+                    "cleaned_ocr": question,
+                    "answer": answer,
+                    "ocr_quality": "manual",
+                    "ocr_warnings": [],
+                    "ocr_duration_s": 0,
+                    "llm_duration_s": duration,
+                    "answer_mode": self.config.get("answer_mode"),
+                    "capture_mode": "manual",
+                    "mode": result.get("mode", "offline"),
+                }
+                self.history.add_entry(entry)
+            except Exception as e:
+                logger.error(f"[Solve] Manual solve crashed: {e}")
+                self._set_answer_safe(f"[Error] Manual solve crashed: {e}")
 
         threading.Thread(target=_solve, daemon=True).start()
 
@@ -461,19 +489,30 @@ class FocusFlowApp:
             # Show panels again
             self._show_panels()
 
-        self.capture.select_region_interactive(on_selected)
+        def on_cancel():
+            self._show_panels()
+
+        self.capture.select_region_interactive(on_selected, on_cancel=on_cancel, root=self.root)
 
     def _on_settings(self) -> None:
         """Open settings dialog."""
+        if self._settings_dialog is not None and self._settings_dialog.winfo_exists():
+            try:
+                self._settings_dialog.lift()
+                self._settings_dialog.focus_force()
+            except Exception:
+                pass
+            return
+
         try:
-            dialog = SettingsDialog(
+            self._settings_dialog = SettingsDialog(
                 self.root,
                 self.config,
                 on_save=self._on_settings_saved,
                 on_opacity_preview=self._set_opacity
             )
             # Protect the settings window too
-            self.root.after(200, lambda: self.guard.protect_all_tk_windows(dialog))
+            self.root.after(200, lambda: self.guard.protect_all_tk_windows(self._settings_dialog))
         except Exception as e:
             logger.error(f"[Settings] Error opening: {e}")
 
@@ -606,6 +645,13 @@ class FocusFlowApp:
             self.root.after(0, lambda: self.answer.set_system_message(text))
         except Exception:
             pass
+
+    def _log_safe(self, msg: str) -> None:
+        """Thread-safe pipeline log append."""
+        try:
+            self.root.after(0, lambda: self.pipeline.log(msg))
+        except Exception:
+            logger.debug("UI dispatch failed: %s", msg)
 
     # ==================================================================
     # Run

@@ -215,21 +215,6 @@ class CaptureGuard:
                 "Exception resetting display affinity on 0x%08X: %s", hwnd, exc
             )
 
-    def _protect_children(self, hwnd: int) -> None:
-        """Enumerate and protect all child windows of *hwnd*."""
-        if user32 is None:
-            return
-
-        @_WNDENUMPROC
-        def _cb(child_hwnd: int, _lparam: int) -> bool:
-            self._apply_exclusion(child_hwnd)
-            return True  # continue enumeration
-
-        try:
-            user32.EnumChildWindows(hwnd, _cb, 0)
-        except Exception as exc:
-            logger.debug("EnumChildWindows error for 0x%08X: %s", hwnd, exc)
-
     def _enum_process_windows(self) -> None:
         """Find all top-level windows belonging to this process and protect them.
 
@@ -254,9 +239,13 @@ class CaptureGuard:
             return True  # continue enumeration
 
         try:
+            # Keep callback reference alive during call
+            self._current_callback = _cb
             user32.EnumWindows(_cb, 0)
         except Exception as exc:
             logger.debug("EnumWindows error: %s", exc)
+        finally:
+            self._current_callback = None
 
     # ------------------------------------------------------------------
     # Tk helpers
@@ -285,29 +274,3 @@ class CaptureGuard:
         except Exception as exc:
             logger.debug("Failed to resolve Tk HWND: %s", exc)
             return None
-
-    def _walk_tk_tree(
-        self,
-        widget: Any,
-        *,
-        _protected_counter: int = 0,
-    ) -> int:
-        """Recursively walk the Tk widget tree and protect Toplevel windows."""
-        try:
-            children = widget.winfo_children()
-        except Exception:
-            return _protected_counter
-
-        for child in children:
-            class_name = child.__class__.__name__
-            if class_name in ("Toplevel", "Tk"):
-                hwnd = self._resolve_tk_hwnd(child)
-                if hwnd:
-                    self.protect_window(hwnd)
-                    _protected_counter += 1
-            # Recurse regardless — Toplevels can be nested under frames.
-            _protected_counter = self._walk_tk_tree(
-                child, _protected_counter=_protected_counter
-            )
-
-        return _protected_counter

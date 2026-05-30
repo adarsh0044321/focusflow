@@ -619,32 +619,30 @@ class SettingsDialog(tk.Toplevel):
     def _save_and_close(self) -> None:
         """Write all widget values back to config and close."""
         try:
-            self.config.set("mode", self._mode_var.get())
-            self.config.set("online_model", self._model_var.get())
-            self.config.set("online_send_mode", self._send_mode_var.get())
-
-            self.config.set("llm_model_path", self._model_path_var.get())
-            self.config.set("llm_threads", self._threads_var.get())
-            self.config.set("llm_gpu_layers", self._gpu_layers_var.get())
-            self.config.set("llm_context_length", self._ctx_len_var.get())
-
-            self.config.set("capture_mode", self._capture_mode_var.get())
-            self.config.set("region_x", self._region_x_var.get())
-            self.config.set("region_y", self._region_y_var.get())
-            self.config.set("region_w", self._region_w_var.get())
-            self.config.set("region_h", self._region_h_var.get())
-
-            self.config.set("ocr_preprocess_grayscale", self._gray_var.get())
-            self.config.set("ocr_preprocess_contrast", self._contrast_var.get())
-            self.config.set("ocr_preprocess_sharpen", self._sharpen_var.get())
-            self.config.set("ocr_preprocess_denoise", self._denoise_var.get())
-            self.config.set("ocr_preprocess_threshold", self._threshold_var.get())
-
-            self.config.set("opacity", self._opacity_var.get())
-            self.config.set("answer_mode", self._answer_mode_var.get())
-            self.config.set("always_on_top", self._always_top_var.get())
-
-            logger.info("Settings saved via dialog")
+            updates = {
+                "mode": self._mode_var.get(),
+                "online_model": self._model_var.get(),
+                "online_send_mode": self._send_mode_var.get(),
+                "llm_model_path": self._model_path_var.get(),
+                "llm_threads": self._threads_var.get(),
+                "llm_gpu_layers": self._gpu_layers_var.get(),
+                "llm_context_length": self._ctx_len_var.get(),
+                "capture_mode": self._capture_mode_var.get(),
+                "region_x": self._region_x_var.get(),
+                "region_y": self._region_y_var.get(),
+                "region_w": self._region_w_var.get(),
+                "region_h": self._region_h_var.get(),
+                "ocr_preprocess_grayscale": self._gray_var.get(),
+                "ocr_preprocess_contrast": self._contrast_var.get(),
+                "ocr_preprocess_sharpen": self._sharpen_var.get(),
+                "ocr_preprocess_denoise": self._denoise_var.get(),
+                "ocr_preprocess_threshold": self._threshold_var.get(),
+                "opacity": self._opacity_var.get(),
+                "answer_mode": self._answer_mode_var.get(),
+                "always_on_top": self._always_top_var.get(),
+            }
+            self.config.batch_update(updates)
+            logger.info("Settings saved via dialog batch update")
         except Exception:
             logger.exception("Error saving settings")
 
@@ -655,3 +653,11 @@ class SettingsDialog(tk.Toplevel):
                 logger.error("Error executing on_save callback: %s", exc)
 
         self.destroy()
+
+    def destroy(self) -> None:
+        """Clean up bindings and destroy the window."""
+        try:
+            self.unbind_all("<MouseWheel>")
+        except Exception:
+            pass
+        super().destroy()

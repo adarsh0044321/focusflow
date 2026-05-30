@@ -51,7 +51,7 @@ class ControlPanel(tk.Toplevel):
         self._on_region: Optional[Callable[[], None]] = None
         self._on_settings: Optional[Callable[[], None]] = None
         self._on_manual_send: Optional[Callable[[str], None]] = None
-        self._on_mode_change: Optional[Callable[[str], None]] = None
+        self._on_mode_change: Optional[Callable[[str, Optional[str]], None]] = None
 
         # --- Tk variables ---------------------------------------------------
         self._mode_var = tk.StringVar(value=self.config.get("mode", "offline"))
@@ -369,7 +369,10 @@ class ControlPanel(tk.Toplevel):
         self._toggle_online_options(new_mode)
         if self._on_mode_change:
             try:
-                self._on_mode_change(new_mode)
+                combined_active = None
+                if new_mode == "combined":
+                    combined_active = self.config.get("combined_active", "offline")
+                self._on_mode_change(new_mode, combined_active)
             except Exception:
                 logger.exception("Error in mode-change callback")
 
@@ -422,7 +425,7 @@ class ControlPanel(tk.Toplevel):
         # get_text_func is accepted for interface parity but the panel
         # always reads from its own Entry widget.
 
-    def set_mode_callback(self, callback: Callable[[str], None]) -> None:
+    def set_mode_callback(self, callback: Callable[[str, Optional[str]], None]) -> None:
         """Register a callback invoked when the mode radio buttons change."""
         self._on_mode_change = callback
 

@@ -11,8 +11,8 @@ import time
 import logging
 import os
 import sys
+import socket
 from typing import Optional
-
 
 logger = logging.getLogger("focusflow.ai")
 
@@ -24,10 +24,29 @@ class OfflineEngine:
         self.config = config
         self.logger = logger
         self._server_process: Optional[subprocess.Popen] = None
-        self._ready: bool = False
-        self._status: str = "Not started"
+        self._ready_event = threading.Event()
+        self._status_lock = threading.Lock()
+        with self._status_lock:
+            self._status = "Not started"
         self._health_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+
+    def _set_status(self, value: str) -> None:
+        with self._status_lock:
+            self._status = value
+
+    def _get_status(self) -> str:
+        with self._status_lock:
+            return self._status
+
+    def _port_in_use(self, port: int) -> bool:
+        """Check if a local TCP port is already occupied."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1.0)
+                return s.connect_ex(('127.0.0.1', port)) == 0
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -40,32 +59,47 @@ class OfflineEngine:
     def stop(self) -> None:
         """Stop the server process and clean up."""
         self._stop_event.set()
+        self._ready_event.clear()
         if self._server_process is not None:
             try:
+                self.logger.info("[LLM] Terminating server process...")
                 self._server_process.terminate()
-                self._server_process.wait(timeout=10)
-                self.logger.info("[LLM] Server process terminated")
-            except subprocess.TimeoutExpired:
-                self._server_process.kill()
-                self.logger.warning("[LLM] Server process killed after timeout")
+                try:
+                    self._server_process.wait(timeout=3)
+                    self.logger.info("[LLM] Server process terminated")
+                except subprocess.TimeoutExpired:
+                    self._server_process.kill()
+                    self._server_process.wait(timeout=2)
+                    self.logger.warning("[LLM] Server process killed after timeout")
             except Exception as exc:
                 self.logger.error(f"[LLM] Error stopping server: {exc}")
             finally:
                 self._server_process = None
-        self._ready = False
-        self._status = "Stopped"
+        self._set_status("Stopped")
 
     def is_ready(self) -> bool:
         """Return True when the backend is loaded and responsive."""
-        return self._ready
+        return self._ready_event.is_set()
 
     def status_message(self) -> str:
         """Return a human-readable status string."""
-        return self._status
+        return self._get_status()
 
     # ------------------------------------------------------------------
     # llama.cpp
     # ------------------------------------------------------------------
+
+    def _read_stderr(self, process: subprocess.Popen) -> None:
+        """Daemon thread target to consume llama-server stderr and prevent hangs."""
+        try:
+            if process.stderr is None:
+                return
+            for line in iter(process.stderr.readline, ""):
+                line_str = line.strip()
+                if line_str:
+                    self.logger.debug(f"[LLM-stderr] {line_str}")
+        except Exception as exc:
+            self.logger.debug(f"[LLM] Stderr reader exception: {exc}")
 
     def _start_llamacpp(self) -> None:
         """Launch llama-server.exe as a silent background subprocess."""
@@ -77,18 +111,23 @@ class OfflineEngine:
             threads: int = int(self.config.get("llm_threads"))
             gpu: int = int(self.config.get("llm_gpu_layers"))
         except Exception as exc:
-            self._status = f"Config error: {exc}"
-            self.logger.error(f"[LLM] {self._status}")
+            self._set_status(f"Config error: {exc}")
+            self.logger.error(f"[LLM] {self._get_status()}")
+            return
+
+        if self._port_in_use(port):
+            self._set_status(f"Port {port} already in use")
+            self.logger.warning(f"[LLM] Port {port} is already in use. Cannot start llama-server.")
             return
 
         if not os.path.isfile(binary):
-            self._status = f"Binary not found: {binary}"
-            self.logger.error(f"[LLM] {self._status}")
+            self._set_status(f"Binary not found: {binary}")
+            self.logger.error(f"[LLM] {self._get_status()}")
             return
 
         if not os.path.isfile(model):
-            self._status = f"Model not found: {model}"
-            self.logger.error(f"[LLM] {self._status}")
+            self._set_status(f"Model not found: {model}")
+            self.logger.error(f"[LLM] {self._get_status()}")
             return
 
         cmd = [
@@ -104,7 +143,7 @@ class OfflineEngine:
         ]
 
         self.logger.info(f"[LLM] Launching: {' '.join(cmd)}")
-        self._status = "Loading model... (may take 30-60s on low-RAM PC)"
+        self._set_status("Loading model... (may take 30-60s on low-RAM PC)")
 
         # Windows-specific: completely hide the console window
         creationflags = 0
@@ -115,16 +154,26 @@ class OfflineEngine:
             self._server_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 creationflags=creationflags,
+                text=True,
+                encoding="utf-8",
+                errors="replace"
             )
+            # Start stderr reader thread to log output and prevent pipe congestion
+            threading.Thread(
+                target=self._read_stderr,
+                args=(self._server_process,),
+                daemon=True,
+                name="llm-stderr-reader"
+            ).start()
         except FileNotFoundError:
-            self._status = f"Cannot execute: {binary}"
-            self.logger.error(f"[LLM] {self._status}")
+            self._set_status(f"Cannot execute: {binary}")
+            self.logger.error(f"[LLM] {self._get_status()}")
             return
         except OSError as exc:
-            self._status = f"OS error launching server: {exc}"
-            self.logger.error(f"[LLM] {self._status}")
+            self._set_status(f"OS error launching server: {exc}")
+            self.logger.error(f"[LLM] {self._get_status()}")
             return
 
         # Start health-polling in a daemon thread
@@ -138,29 +187,66 @@ class OfflineEngine:
         self._health_thread.start()
 
     def _poll_health(self, port: int) -> None:
-        """Poll the llama.cpp /health endpoint every 2s until ready."""
+        """Poll the llama.cpp /health endpoint every 2s until ready, then monitor."""
         url = f"http://127.0.0.1:{port}/health"
-        elapsed = 0
-        while not self._stop_event.is_set():
-            # If the process died, give up
+        retries = 0
+        max_retries = 30
+
+        # Phase 1: Wait/Poll for model loading
+        while not self._stop_event.is_set() and not self._ready_event.is_set():
             if self._server_process is not None and self._server_process.poll() is not None:
-                self._status = "Server process exited unexpectedly"
-                self.logger.error(f"[LLM] {self._status}")
+                self._set_status("Server process exited unexpectedly")
+                self.logger.error("[LLM] Server process exited unexpectedly during startup")
                 return
+
             try:
-                resp = requests.get(url, timeout=3)
+                resp = requests.get(url, timeout=2.0)
                 if resp.status_code == 200:
-                    self._ready = True
-                    self._status = "LLM: Model loaded and ready!"
+                    self._ready_event.set()
+                    self._set_status("LLM: Model loaded and ready!")
                     self.logger.info("[LLM] Server is healthy — model ready")
-                    return
-            except requests.ConnectionError:
+                    break
+            except requests.RequestException:
                 pass
-            except requests.RequestException as exc:
-                self.logger.debug(f"[LLM] Health poll error: {exc}")
-            elapsed += 2
-            self._status = f"Loading model... ({elapsed}s elapsed)"
+
+            retries += 1
+            if retries >= max_retries:
+                self._set_status("Timeout: model failed to load")
+                self.logger.error("[LLM] Timeout waiting for model to load. Killing server.")
+                self.stop()
+                return
+
+            self._set_status(f"Loading model... ({retries * 2}s elapsed)")
             self._stop_event.wait(2.0)
+
+        # Phase 2: Continuous post-ready monitoring
+        while not self._stop_event.is_set():
+            self._stop_event.wait(5.0)
+            if self._stop_event.is_set():
+                break
+
+            # Check if process is still alive
+            if self._server_process is None or self._server_process.poll() is not None:
+                self._ready_event.clear()
+                self._set_status("Server crashed")
+                self.logger.error("[LLM] Server process died post-readiness")
+                break
+
+            # Poll health endpoint again to confirm responsiveness
+            try:
+                resp = requests.get(url, timeout=3.0)
+                if resp.status_code != 200:
+                    self._ready_event.clear()
+                    self._set_status("Server unresponsive")
+                    self.logger.warning("[LLM] Server returned unhealthy status code")
+                else:
+                    if not self._ready_event.is_set():
+                        self._ready_event.set()
+                        self._set_status("LLM: Model loaded and ready!")
+            except requests.RequestException:
+                self._ready_event.clear()
+                self._set_status("Server unresponsive")
+                self.logger.warning("[LLM] Health check timed out or failed post-readiness")
 
     # ------------------------------------------------------------------
     # Prompt formatting (Phi-3 chat template)
@@ -198,7 +284,7 @@ class OfflineEngine:
         knowledge_context: str = "",
     ) -> str:
         """Send a prompt to llama.cpp and return the answer text."""
-        if not self._ready:
+        if not self._ready_event.is_set():
             raise RuntimeError("Offline engine is not ready")
 
         return self._query_llamacpp(prompt, system_prompt, knowledge_context)
