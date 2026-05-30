@@ -1,0 +1,12 @@
+CHAPTER: Binomial Theorem
+
+(a + b)^n = Σ C(n,r) a^(n-r)b^r
+
+GENERAL TERM:
+T(r+1) = C(n,r)a^(n-r)b^r
+
+IMPORTANT:
+C(n,r) = C(n,n-r)
+
+MIDDLE TERM:
+r = n/2

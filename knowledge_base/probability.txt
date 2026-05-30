@@ -1,0 +1,12 @@
+CHAPTER: Probability
+
+P(A) = favorable / total
+
+CONDITIONAL:
+P(A|B) = P(A∩B)/P(B)
+
+BAYES:
+P(A|B) = P(B|A)P(A)/P(B)
+
+IMPORTANT:
+0 ≤ P ≤ 1

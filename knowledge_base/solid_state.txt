@@ -1,0 +1,13 @@
+CHAPTER: Solid State
+
+DENSITY:
+= ZM / a³NA
+
+COORDINATION:
+SC = 6
+BCC = 8
+FCC = 12
+
+IMPORTANT:
+Packing efficiency:
+FCC > BCC > SC

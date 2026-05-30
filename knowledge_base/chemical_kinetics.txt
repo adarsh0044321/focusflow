@@ -1,0 +1,17 @@
+CHAPTER: Chemical Kinetics
+
+RATE:
+= Δconc/time
+
+ORDER:
+Rate = k[A]^n
+
+HALF LIFE:
+1st → 0.693/k
+
+ARRHENIUS:
+k = Ae^(-Ea/RT)
+
+IMPORTANT:
+Higher T → faster reaction
+Catalyst lowers Ea

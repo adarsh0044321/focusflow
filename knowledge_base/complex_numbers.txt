@@ -1,0 +1,17 @@
+CHAPTER: Complex Numbers
+
+FORM:
+z = x + iy
+
+MODULUS:
+|z| = √(x² + y²)
+
+ARGUMENT:
+tanθ = y/x
+
+CONJUGATE:
+z̄ = x - iy
+
+IMPORTANT:
+|z₁z₂| = |z₁||z₂|
+Arg(z₁z₂) = Argz₁ + Argz₂

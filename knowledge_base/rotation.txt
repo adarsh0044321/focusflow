@@ -1,0 +1,23 @@
+CHAPTER: Rotational Motion
+
+TORQUE:
+τ = r × F
+
+ANGULAR MOTION:
+ω = angular velocity
+α = angular acceleration
+
+EQUATIONS:
+ω = ω₀ + αt
+θ = ω₀t + (1/2)αt²
+
+ROTATIONAL KE:
+= (1/2)Iω²
+
+MOMENT OF INERTIA:
+Ring = MR²
+Disc = (1/2)MR²
+Rod (center) = (1/12)ML²
+
+PARALLEL AXIS:
+I = I_cm + Md²

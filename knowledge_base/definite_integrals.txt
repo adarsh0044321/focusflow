@@ -1,0 +1,9 @@
+CHAPTER: Definite Integrals
+
+∫a→b f(x)dx
+
+PROPERTIES:
+∫a→b f(x)dx = -∫b→a f(x)
+
+IMPORTANT:
+Area under curve

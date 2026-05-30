@@ -1,0 +1,15 @@
+CHAPTER: Derivatives
+
+DEFINITION:
+dy/dx = lim Δy/Δx
+
+RULES:
+d(xⁿ)/dx = nx^(n-1)
+d(sin x) = cos x
+d(cos x) = -sin x
+
+CHAIN RULE:
+d/dx f(g(x))
+
+IMPORTANT:
+slope of tangent

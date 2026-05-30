@@ -1,0 +1,17 @@
+CHAPTER: Solutions
+
+MOLARITY:
+M = moles/L
+
+MOLALITY:
+m = moles/kg solvent
+
+RAOULT:
+P = X P°
+
+COLLIGATIVE:
+ΔTb = iKb m
+ΔTf = iKf m
+
+IMPORTANT:
+i = van’t Hoff factor

@@ -1,0 +1,30 @@
+CHAPTER: Kinematics
+
+BASICS:
+Displacement (s), Velocity (v), Acceleration (a)
+
+FORMULAS:
+v = u + at
+s = ut + (1/2)at²
+v² = u² + 2as
+s = ((u + v)/2)t
+
+AVERAGE VELOCITY:
+= total displacement / time
+
+RELATIVE VELOCITY:
+v_AB = v_A - v_B
+
+PROJECTILE MOTION:
+Time of flight = 2u sinθ / g
+Max height = u² sin²θ / (2g)
+Range = u² sin2θ / g
+
+IMPORTANT:
+Horizontal velocity constant
+Vertical motion under gravity
+
+GRAPHS:
+Slope of x-t → velocity
+Slope of v-t → acceleration
+Area under v-t → displacement

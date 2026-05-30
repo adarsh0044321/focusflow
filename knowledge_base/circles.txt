@@ -1,0 +1,13 @@
+CHAPTER: Circles
+
+STANDARD:
+(x - h)² + (y - k)² = r²
+
+GENERAL:
+x² + y² + Dx + Ey + F = 0
+
+RADIUS:
+√[(D² + E²)/4 - F]
+
+IMPORTANT:
+Tangent: distance = radius

@@ -1,0 +1,19 @@
+CHAPTER: Properties of Matter
+
+STRESS:
+= Force / Area
+
+STRAIN:
+= Change / Original
+
+YOUNG MODULUS:
+Y = stress / strain
+
+FLUID:
+Pressure = ρgh
+
+BERNOULLI:
+P + (1/2)ρv² + ρgh = constant
+
+VISCOSITY:
+F = ηA dv/dx

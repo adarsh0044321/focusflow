@@ -1,0 +1,19 @@
+CHAPTER: Gravitation
+
+LAW:
+F = Gm₁m₂ / r²
+
+GRAVITY:
+g = GM / R²
+
+POTENTIAL:
+V = -GM / r
+
+ESCAPE VELOCITY:
+v = √(2GM/R)
+
+ORBITAL VELOCITY:
+v = √(GM/R)
+
+IMPORTANT:
+g decreases with height

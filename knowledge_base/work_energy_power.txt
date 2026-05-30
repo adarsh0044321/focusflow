@@ -1,0 +1,22 @@
+CHAPTER: Work Energy Power
+
+WORK:
+W = F·s cosθ
+
+KINETIC ENERGY:
+KE = (1/2)mv²
+
+POTENTIAL ENERGY:
+PE = mgh
+
+WORK-ENERGY THEOREM:
+Net work = change in KE
+
+POWER:
+P = W/t = F·v
+
+CONSERVATION:
+Total energy constant (no non-conservative forces)
+
+IMPORTANT:
+Spring energy = (1/2)kx²

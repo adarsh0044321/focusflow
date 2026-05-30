@@ -1,0 +1,18 @@
+CHAPTER: States of Matter
+
+IDEAL GAS:
+PV = nRT
+
+REAL GAS:
+(P + a/V²)(V - b) = RT
+
+RMS SPEED:
+v = √(3RT/M)
+
+GRAHAM LAW:
+r ∝ 1/√M
+
+IMPORTANT:
+Deviation high at:
+- high pressure
+- low temperature

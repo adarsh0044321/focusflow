@@ -1,0 +1,15 @@
+CHAPTER: Coordination Compounds
+
+CN:
+= number of ligands
+
+CFSE:
+splitting of d orbitals
+
+ISOMERISM:
+geometrical
+optical
+
+IMPORTANT:
+Strong field → pairing
+Weak field → unpaired

@@ -1,0 +1,13 @@
+CHAPTER: EMI
+
+FARADAY:
+ε = -dΦ/dt
+
+LENZ LAW:
+Opposes cause
+
+MOTIONAL EMF:
+ε = Blv
+
+IMPORTANT:
+Energy conservation principle

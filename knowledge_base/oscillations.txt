@@ -1,0 +1,17 @@
+CHAPTER: Oscillations
+
+SHM:
+a = -ω²x
+
+TIME PERIOD:
+T = 2π√(m/k)
+
+ENERGY:
+Total = constant
+
+SPRING:
+F = -kx
+
+IMPORTANT:
+Max velocity = ωA
+Max acceleration = ω²A

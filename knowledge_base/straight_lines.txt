@@ -1,0 +1,15 @@
+CHAPTER: Straight Lines
+
+SLOPE:
+m = (y₂ - y₁)/(x₂ - x₁)
+
+FORMS:
+y = mx + c
+y - y₁ = m(x - x₁)
+
+DISTANCE:
+|Ax + By + C| / √(A² + B²)
+
+IMPORTANT:
+Parallel → m₁ = m₂
+Perpendicular → m₁m₂ = -1

@@ -1,0 +1,14 @@
+CHAPTER: Organic Reactions
+
+SN1:
+carbocation intermediate
+
+SN2:
+single step
+
+E1/E2:
+elimination
+
+IMPORTANT:
+Reactivity:
+3° > 2° > 1°

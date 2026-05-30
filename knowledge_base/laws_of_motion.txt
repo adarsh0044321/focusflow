@@ -1,0 +1,23 @@
+CHAPTER: Laws of Motion
+
+NEWTON LAWS:
+F = ma
+Action = Reaction
+
+FORCE:
+Weight = mg
+Normal reaction (N)
+
+FRICTION:
+f ≤ μN
+Limiting friction = μN
+
+INCLINED PLANE:
+mg sinθ → down slope
+mg cosθ → normal
+
+TENSION:
+Same in ideal string
+
+IMPORTANT:
+Pseudo force = -ma (non-inertial frame)

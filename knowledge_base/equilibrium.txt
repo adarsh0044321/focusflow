@@ -1,0 +1,17 @@
+CHAPTER: Equilibrium
+
+Kc:
+= products / reactants
+
+LE CHATELIER:
+System opposes change
+
+pH:
+= -log[H+]
+
+BUFFER:
+pH = pKa + log([salt]/[acid])
+
+IMPORTANT:
+Kw = 10^-14
+Strong acid → fully ionized

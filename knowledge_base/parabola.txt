@@ -1,0 +1,13 @@
+CHAPTER: Parabola
+
+STANDARD:
+y² = 4ax
+
+FOCUS:
+(a,0)
+
+DIRECTRIX:
+x = -a
+
+IMPORTANT:
+Latus rectum = 4a

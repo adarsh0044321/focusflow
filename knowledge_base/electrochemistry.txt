@@ -1,0 +1,14 @@
+CHAPTER: Electrochemistry
+
+EMF:
+Ecell = Ecathode - Eanode
+
+NERNST:
+E = E° - (0.059/n) logQ
+
+FARADAY:
+m = (ItM)/(nF)
+
+IMPORTANT:
+Galvanic → spontaneous
+Electrolytic → non-spontaneous

@@ -1,0 +1,12 @@
+CHAPTER: Applications of Derivatives
+
+MAX/MIN:
+f'(x) = 0
+
+TEST:
+f''(x) > 0 → min
+f''(x) < 0 → max
+
+IMPORTANT:
+Increasing → f'(x) > 0
+Decreasing → f'(x) < 0

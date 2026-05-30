@@ -1,0 +1,13 @@
+CHAPTER: Statistics
+
+MEAN:
+Σx/n
+
+VARIANCE:
+σ² = Σ(x - μ)²/n
+
+STANDARD DEV:
+σ = √variance
+
+IMPORTANT:
+Mean deviation

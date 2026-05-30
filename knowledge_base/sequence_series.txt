@@ -1,0 +1,16 @@
+CHAPTER: Sequence & Series
+
+AP:
+aₙ = a + (n-1)d
+Sₙ = n/2 [2a + (n-1)d]
+
+GP:
+aₙ = ar^(n-1)
+Sₙ = a(1-rⁿ)/(1-r)
+
+IMPORTANT:
+AM ≥ GM
+
+SUM FORMULAS:
+Σn = n(n+1)/2
+Σn² = n(n+1)(2n+1)/6

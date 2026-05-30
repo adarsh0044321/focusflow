@@ -1,0 +1,16 @@
+CHAPTER: Modern Physics
+
+PHOTOELECTRIC:
+E = hf - φ
+
+DE BROGLIE:
+λ = h/p
+
+BOHR:
+Eₙ = -13.6 / n²
+
+RADIOACTIVITY:
+N = N₀e^(-λt)
+
+IMPORTANT:
+Dual nature

@@ -1,0 +1,26 @@
+CHAPTER: Mole Concept
+
+AVOGADRO:
+1 mole = 6.022×10^23 particles
+
+MOLAR MASS:
+= mass of 1 mole
+
+FORMULAS:
+moles = mass / molar mass
+moles = number / NA
+moles = volume (L) / 22.4 (at STP)
+
+NORMALITY:
+N = equivalents / volume
+Equivalent = molar mass / n-factor
+
+n-FACTOR:
+Acid → basicity
+Base → acidity
+Redox → electron exchange
+
+IMPORTANT:
+% composition = (mass of element / molar mass) × 100
+Empirical formula → simplest ratio
+Molecular = n × empirical

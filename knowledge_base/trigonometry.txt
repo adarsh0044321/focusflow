@@ -1,0 +1,23 @@
+CHAPTER: Trigonometry
+
+IDENTITIES:
+sin²θ + cos²θ = 1
+1 + tan²θ = sec²θ
+1 + cot²θ = cosec²θ
+
+FORMULAS:
+sin(A ± B)
+cos(A ± B)
+tan(A ± B)
+
+DOUBLE:
+sin2θ = 2sinθcosθ
+cos2θ = cos²θ - sin²θ
+
+IMPORTANT VALUES:
+sin30 = 1/2
+cos60 = 1/2
+tan45 = 1
+
+GENERAL SOLUTION:
+sinx = sinθ → x = nπ + (-1)^n θ

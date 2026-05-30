@@ -1,0 +1,12 @@
+CHAPTER: Integrals
+
+BASIC:
+∫xⁿ dx = x^(n+1)/(n+1)
+
+FORMULAS:
+∫sinx = -cosx
+∫cosx = sinx
+
+IMPORTANT:
+substitution
+partial fractions

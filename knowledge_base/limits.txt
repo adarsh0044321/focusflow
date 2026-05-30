@@ -1,0 +1,13 @@
+CHAPTER: Limits
+
+FORM:
+lim x→a f(x)
+
+IMPORTANT LIMITS:
+lim (sinx/x) = 1
+lim (1 + 1/x)^x = e
+
+TECHNIQUES:
+factorization
+rationalization
+L’Hospital

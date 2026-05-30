@@ -1,0 +1,20 @@
+CHAPTER: Thermodynamics
+
+FIRST LAW:
+Q = ΔU + W
+
+IDEAL GAS:
+PV = nRT
+
+WORK:
+W = PΔV
+
+HEAT:
+Q = mcΔT
+
+EFFICIENCY:
+η = W/Q
+
+IMPORTANT:
+Isothermal → PV = constant
+Adiabatic → PV^γ = constant

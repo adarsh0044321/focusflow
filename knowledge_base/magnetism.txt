@@ -1,0 +1,16 @@
+CHAPTER: Magnetism
+
+FORCE:
+F = qvB sinθ
+
+LORENTZ:
+F = q(E + v × B)
+
+BIOT-SAVART:
+dB ∝ Idl × r / r³
+
+AMPERE:
+∮B·dl = μ₀I
+
+IMPORTANT:
+Right-hand rule

@@ -1,0 +1,10 @@
+CHAPTER: Differential Equations
+
+FORM:
+dy/dx = f(x,y)
+
+SOLUTION:
+separation of variables
+
+IMPORTANT:
+general solution + constant

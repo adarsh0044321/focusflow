@@ -1,0 +1,19 @@
+CHAPTER: Optics
+
+MIRROR:
+1/f = 1/v + 1/u
+
+LENS:
+1/f = 1/v - 1/u
+
+MAGNIFICATION:
+m = v/u
+
+REFRACTION:
+n = sin i / sin r
+
+TOTAL INTERNAL REFLECTION:
+sinC = 1/n
+
+IMPORTANT:
+Ray diagrams

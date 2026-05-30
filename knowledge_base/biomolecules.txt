@@ -1,0 +1,13 @@
+CHAPTER: Biomolecules
+
+CARBS:
+glucose
+
+PROTEINS:
+amino acids
+
+DNA:
+double helix
+
+IMPORTANT:
+Enzymes → catalysts

@@ -1,0 +1,19 @@
+CHAPTER: Current Electricity
+
+OHM LAW:
+V = IR
+
+POWER:
+P = VI = I²R
+
+RESISTANCE:
+R = ρL/A
+
+SERIES:
+R = R₁ + R₂
+
+PARALLEL:
+1/R = 1/R₁ + 1/R₂
+
+IMPORTANT:
+Drift velocity concept

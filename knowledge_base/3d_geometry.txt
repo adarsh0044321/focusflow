@@ -1,0 +1,10 @@
+CHAPTER: 3D Geometry
+
+DISTANCE:
+√[(x₂-x₁)² + (y₂-y₁)² + (z₂-z₁)²]
+
+DIRECTION COSINES:
+l² + m² + n² = 1
+
+IMPORTANT:
+Line equations

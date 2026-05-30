@@ -1,0 +1,26 @@
+CHAPTER: Quadratic Equations
+
+GENERAL:
+ax² + bx + c = 0
+
+ROOTS:
+x = (-b ± √(b² - 4ac)) / 2a
+
+DISCRIMINANT:
+D = b² - 4ac
+D > 0 → real, distinct
+D = 0 → equal
+D < 0 → complex
+
+RELATIONS:
+α + β = -b/a
+αβ = c/a
+
+FORMATION:
+x² - (sum)x + product = 0
+
+MIN/MAX:
+Min value = -D / 4a (a > 0)
+
+IMPORTANT:
+Parabola vertex: (-b/2a, -D/4a)

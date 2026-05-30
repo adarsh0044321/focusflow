@@ -1,0 +1,17 @@
+CHAPTER: Redox
+
+OXIDATION:
+loss of e-
+
+REDUCTION:
+gain of e-
+
+OXIDATION NUMBER:
+sum = charge
+
+BALANCING:
+Ion-electron method
+
+IMPORTANT:
+Oxidizing agent → reduced
+Reducing agent → oxidized

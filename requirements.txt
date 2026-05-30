@@ -1,0 +1,8 @@
+# FocusFlow Dependencies
+# Install with: pip install -r requirements.txt
+
+mss>=9.0.0           # Screen capture
+Pillow>=10.0.0       # Image processing
+requests>=2.31.0     # HTTP client (for llama.cpp API)
+openai>=1.30.0       # OpenAI API client
+keyboard>=0.13.5     # Global hotkeys (Windows)

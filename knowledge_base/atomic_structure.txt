@@ -1,0 +1,32 @@
+CHAPTER: Atomic Structure
+
+DE BROGLIE:
+λ = h/p
+
+HEISENBERG:
+Δx·Δp ≥ h/4π
+
+BOHR:
+Eₙ = -13.6 / n² eV
+
+RADIUS:
+rₙ ∝ n²
+
+QUANTUM NUMBERS:
+n → shell
+l → subshell
+m → orientation
+s → spin
+
+AUFBAU:
+n+l rule
+
+PAULI:
+max 2 electrons/opposite spin
+
+HUND:
+max unpaired
+
+IMPORTANT:
+No. of orbitals = n²
+Max electrons = 2n²

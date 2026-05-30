@@ -1,0 +1,11 @@
+CHAPTER: Vectors
+
+DOT:
+A·B = |A||B|cosθ
+
+CROSS:
+|A×B| = |A||B|sinθ
+
+IMPORTANT:
+Parallel → cross = 0
+Perpendicular → dot = 0

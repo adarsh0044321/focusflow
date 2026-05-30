@@ -1,0 +1,19 @@
+CHAPTER: Electrostatics
+
+COULOMB LAW:
+F = kq₁q₂ / r²
+
+FIELD:
+E = F/q
+
+POTENTIAL:
+V = kq/r
+
+CAPACITOR:
+C = Q/V
+
+PARALLEL PLATE:
+C = εA/d
+
+ENERGY:
+U = (1/2)CV²

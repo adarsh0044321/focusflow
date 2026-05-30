@@ -1,0 +1,23 @@
+CHAPTER: Thermodynamics
+
+FIRST LAW:
+ΔU = q + w
+
+ENTHALPY:
+H = U + PV
+
+ΔH:
+Exo → negative
+Endo → positive
+
+ENTROPY:
+ΔS = q/T
+
+GIBBS:
+ΔG = ΔH - TΔS
+
+SPONTANEITY:
+ΔG < 0
+
+IMPORTANT:
+At equilibrium ΔG = 0

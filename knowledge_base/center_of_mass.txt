@@ -1,0 +1,13 @@
+CHAPTER: Center of Mass
+
+COM:
+R = (Σmᵢrᵢ) / Σmᵢ
+
+MOTION:
+F = M a_com
+
+IMPORTANT:
+Internal forces cancel
+
+SPECIAL:
+Uniform rod → COM at center

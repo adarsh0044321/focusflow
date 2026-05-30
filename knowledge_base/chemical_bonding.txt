@@ -1,0 +1,25 @@
+CHAPTER: Chemical Bonding
+
+IONIC:
+Electrostatic attraction
+
+COVALENT:
+Sharing electrons
+
+VSEPR:
+Shape depends on lone pairs
+
+HYBRIDIZATION:
+sp → linear
+sp2 → trigonal planar
+sp3 → tetrahedral
+
+FORMAL CHARGE:
+= valence - (lone + bonds/2)
+
+BOND ORDER:
+BO = (Nb - Na)/2
+
+IMPORTANT:
+More BO → more stable
+More electronegativity → polar bond

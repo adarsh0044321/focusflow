@@ -1,0 +1,16 @@
+CHAPTER: Waves
+
+WAVE SPEED:
+v = fλ
+
+TIME PERIOD:
+T = 1/f
+
+DOPPLER:
+f' = f (v ± v₀) / (v ∓ v_s)
+
+STANDING WAVES:
+Nodes & antinodes
+
+IMPORTANT:
+Speed depends on medium
