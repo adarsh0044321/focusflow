@@ -146,8 +146,8 @@ class SettingsDialog(tk.Toplevel):
         self._scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self._canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        # Mousewheel scrolling
-        self._canvas.bind_all(
+        # Mousewheel scrolling (bound locally to settings dialog window)
+        self.bind(
             "<MouseWheel>",
             lambda e: self._canvas.yview_scroll(-int(e.delta / 120), "units"),
         )
@@ -656,8 +656,4 @@ class SettingsDialog(tk.Toplevel):
 
     def destroy(self) -> None:
         """Clean up bindings and destroy the window."""
-        try:
-            self.unbind_all("<MouseWheel>")
-        except Exception:
-            pass
         super().destroy()
