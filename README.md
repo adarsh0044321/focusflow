@@ -3,9 +3,9 @@
 [![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Platform](https://img.shields.io/badge/platform-windows-lightgrey.svg?style=for-the-badge&logo=windows)](https://microsoft.com/windows)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
-[![AI Engine](https://img.shields.io/badge/AI--Engine-GPT--5%20%7C%20Phi--3-purple.svg?style=for-the-badge)](online_engine.py)
+[![AI Engine](https://img.shields.io/badge/AI--Engine-GPT--4o%20%7C%20Phi--3-purple.svg?style=for-the-badge)](online_engine.py)
 
-FocusFlow is an ultra-stealth, hybrid offline-online educational assistance tool designed for Windows. It captures selected screen regions, runs a high-fidelity OCR preprocessing pipeline, cleans structural layout artifacts, queries local knowledge bases, and routes the context to an AI engine (either a local background `llama.cpp` model or a key-rotated OpenAI `gpt-5` online client) to methodically solve exam and study questions in real-time.
+FocusFlow is an ultra-stealth, hybrid offline-online educational assistance tool designed for Windows. It captures selected screen regions, runs a high-fidelity OCR preprocessing pipeline, cleans structural layout artifacts, queries local knowledge bases, and routes the context to an AI engine (either a local background `llama.cpp` model or a key-rotated OpenAI `gpt-4o` / `gpt-4o-mini` online client) to methodically solve exam and study questions in real-time.
 
 ---
 
@@ -21,8 +21,8 @@ FocusFlow is an ultra-stealth, hybrid offline-online educational assistance tool
 
 ### 🧠 3. Hybrid AI Solving Engine
 - **Offline Backend**: Launches a silent `llama-server.exe` subprocess in the background with `CREATE_NO_WINDOW` flags, serving `Phi-3-mini-4k-instruct-q4.gguf` locally.
-- **Online Responses API (`gpt-5`)**: Integrates the state-of-the-art OpenAI Responses API with model `gpt-5` utilizing multimodal vision payloads and text inputs.
-- **API Key Rotation**: Allows adding multiple OpenAI API keys in a pool and rotates automatically in round-robin fashion upon encountering rate-limit or quota errors (`429` status codes).
+- **Online API (`gpt-4o`/`gpt-4o-mini`)**: Integrates standard OpenAI chat completions with vision payload optimization (automatic image resizing to 1280px JPEG and quality 85 compression to reduce network latency).
+- **API Key Rotation & Retry**: Supports multiple OpenAI API keys in a rotation pool, automatically rotating keys and applying exponential backoff delay during rate limits or status `429` errors.
 
 ### 🎛️ 4. Premium Dark HUD UI
 - Draggable glassmorphic borderless panels with macOS-inspired title bars.
@@ -45,7 +45,7 @@ graph TD
     G --> H{Engine Router}
     
     H -- Offline Mode --> I[llama.cpp Background Server]
-    H -- Online Mode --> J[OpenAI Responses API / gpt-5]
+    H -- Online Mode --> J[OpenAI API / gpt-4o / gpt-4o-mini]
     H -- Hybrid Mode --> K{Offline Ready?}
     
     K -- Yes --> I
@@ -102,7 +102,7 @@ No Python installation or dependency setup is required.
 ### ⚙️ Initial Configuration
 Once the application is running (from executable or source), configure the settings drawer:
 1. Press **`Ctrl+Shift+S`** (or click the settings gear icon on the Control Panel) to open the Config panel.
-2. **For Online Mode**: Enter one or more OpenAI API keys in the online API key field and click **Add**. FocusFlow will rotate keys automatically if one hits rate limits or quota issues.
+2. **For Online Mode**: Enter one or more OpenAI API keys in the online API key field and click **Add**. FocusFlow will rotate keys automatically if one hits rate limits or quota issues. Select your desired model (e.g. `gpt-4o` or `gpt-4o-mini`) from the dropdown.
 3. **For Offline Mode**: Ensure the local GGUF model file is placed in `models/` and matches the path configured in Settings (defaults to `models/Phi-3-mini-4k-instruct-q4.gguf`).
 
 ---
@@ -127,11 +127,10 @@ FocusFlow runs persistently in the background. Use the following global shortcut
 The repository is fully optimized for production packaging and git deployment:
 1. **Repository Hygiene**: The `.gitignore` is pre-configured to exclude large external binaries (`Tesseract-OCR`, `llama.cpp-master`, `svchost.exe`), model weights (`models/`), local database configurations (`data/settings.json`), logs, and screenshots.
 2. **Prerequisites for Release Build**:
-   To bundle FocusFlow into a standalone executable (without requiring Python to be installed on target machines):
-   ```powershell
-   pip install pyinstaller
-   pyinstaller --noconsole --onefile --icon=assets/icon.ico main.py
-   ```
+    To bundle FocusFlow into a standalone executable (without requiring Python to be installed on target machines):
+    ```powershell
+    python -m PyInstaller FocusFlow.spec --noconfirm
+    ```
 
 ---
 
