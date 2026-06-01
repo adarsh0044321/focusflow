@@ -18,6 +18,7 @@ All planned bug fixes, thread-safety locking, and interface enhancements have be
 - **Thread Safety**: Added a reentrant lock `self._key_lock` to protect key rotation variables.
 - **Network Optimization**: Implemented automatic PIL image resizing to 1280px maximum width and converted images to JPEG quality 85 instead of lossless PNG to reduce transmission latency.
 - **Backoff & Quotas**: Added a sleep backoff during retries and handled status 400/404 failures by falling back to `"gpt-4o-mini"`.
+- **Model Selection & Defaults**: Updated the default model in `config_manager.py` to `gpt-4o` (from invalid `gpt-5`) and expanded choices in `settings_dialog.py` to list `"gpt-4o"`, `"gpt-4o-mini"`, `"o1-mini"`, and `"gpt-5"`.
 
 ### Unified AI Engine (`ai_engine.py`)
 - **Knowledge Base Query Mismatch**: Passed the actual OCR text / user query in `solve` and `solve_manual` to `kb.get_context(query)` instead of an empty string, ensuring correct reference document lookups.
