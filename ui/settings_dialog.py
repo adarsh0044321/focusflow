@@ -87,6 +87,8 @@ class SettingsDialog(tk.Toplevel):
             value=config.get("online_send_mode", "ocr")
         )
         self._model_var = tk.StringVar(value=config.get("online_model", "gpt-4o"))
+        self._online_base_url_var = tk.StringVar(value=config.get("online_base_url", ""))
+        self._online_custom_model_var = tk.StringVar(value=config.get("online_custom_model", ""))
 
         self._model_path_var = tk.StringVar(
             value=config.get("llm_model_path", "")
@@ -284,6 +286,44 @@ class SettingsDialog(tk.Toplevel):
             width=18,
         )
         model_combo.pack(side=tk.LEFT, padx=6)
+
+        # --- Base URL Entry -------------------------------------------------
+        url_row = tk.Frame(lf, bg=BG_DARK)
+        url_row.pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            url_row, text="Base URL:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
+        ).pack(side=tk.LEFT)
+        tk.Entry(
+            url_row,
+            textvariable=self._online_base_url_var,
+            font=FONT_SMALL,
+            fg=FG_TEXT,
+            bg=BG_INPUT,
+            insertbackground=FG_GREEN,
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=FG_DIM,
+            highlightcolor=FG_GREEN,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 0), ipady=2)
+
+        # --- Custom Model Entry ---------------------------------------------
+        custom_model_row = tk.Frame(lf, bg=BG_DARK)
+        custom_model_row.pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            custom_model_row, text="Custom Model:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
+        ).pack(side=tk.LEFT)
+        tk.Entry(
+            custom_model_row,
+            textvariable=self._online_custom_model_var,
+            font=FONT_SMALL,
+            fg=FG_TEXT,
+            bg=BG_INPUT,
+            insertbackground=FG_GREEN,
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=FG_DIM,
+            highlightcolor=FG_GREEN,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 0), ipady=2)
 
         # --- Send mode ------------------------------------------------------
         send_row = tk.Frame(lf, bg=BG_DARK)
@@ -623,6 +663,8 @@ class SettingsDialog(tk.Toplevel):
                 "mode": self._mode_var.get(),
                 "online_model": self._model_var.get(),
                 "online_send_mode": self._send_mode_var.get(),
+                "online_base_url": self._online_base_url_var.get(),
+                "online_custom_model": self._online_custom_model_var.get(),
                 "llm_model_path": self._model_path_var.get(),
                 "llm_threads": self._threads_var.get(),
                 "llm_gpu_layers": self._gpu_layers_var.get(),

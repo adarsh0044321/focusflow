@@ -94,6 +94,9 @@ class CaptureGuard:
         and also discovers any new process-owned windows via
         ``EnumWindows``.
         """
+        if user32 is None:
+            logger.info("CaptureGuard: Win32 API unavailable — guard thread start skipped.")
+            return
         if self._running:
             logger.debug("Guard thread already running")
             return

@@ -49,6 +49,7 @@ class ControlPanel(tk.Toplevel):
         # --- Callbacks (set later via public helpers) -----------------------
         self._on_solve: Optional[Callable[[], None]] = None
         self._on_region: Optional[Callable[[], None]] = None
+        self._on_history: Optional[Callable[[], None]] = None
         self._on_settings: Optional[Callable[[], None]] = None
         self._on_manual_send: Optional[Callable[[str], None]] = None
         self._on_mode_change: Optional[Callable[[str, Optional[str]], None]] = None
@@ -175,6 +176,7 @@ class ControlPanel(tk.Toplevel):
         tab_defs: list[tuple[str, str, str, Callable[[], None]]] = [
             ("AI Solve", FG_GOLD, BG_DARK, self._handle_solve),
             ("Region Active", FG_GREEN, BG_DARK, self._handle_region),
+            ("History", ACCENT_PURPLE, BG_DARK, self._handle_history),
             ("Settings", "#20b2aa", BG_DARK, self._handle_settings),
         ]
 
@@ -354,6 +356,13 @@ class ControlPanel(tk.Toplevel):
             except Exception:
                 logger.exception("Error in settings callback")
 
+    def _handle_history(self) -> None:
+        if self._on_history:
+            try:
+                self._on_history()
+            except Exception:
+                logger.exception("Error in history callback")
+
     def _handle_manual_send(self) -> None:
         text = self.get_manual_text()
         if not text:
@@ -410,6 +419,10 @@ class ControlPanel(tk.Toplevel):
     def set_on_settings(self, callback: Callable[[], None]) -> None:
         """Register a callback for the Settings button."""
         self._on_settings = callback
+
+    def set_on_history(self, callback: Callable[[], None]) -> None:
+        """Register a callback for the History button."""
+        self._on_history = callback
 
     def set_on_manual_send(
         self,

@@ -24,6 +24,17 @@ _MAX_CHARS_PER_TOPIC: int = 500
 # Number of top matches to include in context.
 _TOP_N: int = 3
 
+# Common English stop words to ignore during keyword matching
+_STOP_WORDS = {
+    "the", "and", "of", "to", "in", "is", "it", "you", "that", "he", "was", "for", "on", "are", "as", "with",
+    "his", "they", "at", "be", "this", "have", "from", "or", "one", "had", "by", "but", "not", "what", "all",
+    "were", "we", "when", "your", "can", "said", "there", "use", "an", "each", "which", "she", "do", "how",
+    "their", "if", "will", "up", "other", "about", "out", "many", "then", "them", "these", "so", "some",
+    "her", "would", "make", "like", "him", "into", "has", "look", "two", "more", "write", "go", "see",
+    "no", "way", "could", "people", "my", "than", "first", "water", "been", "call", "who", "oil", "its",
+    "now", "find", "why", "whose", "whom", "our", "those", "thus", "also", "very", "much", "most"
+}
+
 
 class KnowledgeBase:
     """In-memory collection of topic files with keyword search.
@@ -44,6 +55,8 @@ class KnowledgeBase:
 
         # {topic_name: full_text}
         self._topics: dict[str, str] = {}
+        # {topic_name: set_of_words}
+        self._topic_words: dict[str, set[str]] = {}
 
         self.reload()
 
@@ -74,13 +87,23 @@ class KnowledgeBase:
 
         # Tokenise the question into unique lowercase words (≥2 chars).
         words = set(re.findall(r"[a-zA-Z0-9]{2,}", question_text.lower()))
+        # Filter out common stop words
+        words = {w for w in words if w not in _STOP_WORDS}
         if not words:
             return ""
 
         scored: list[tuple[str, int]] = []
-        for topic, text in self._topics.items():
-            text_lower = text.lower()
-            score = sum(1 for w in words if w in text_lower)
+        for topic, topic_w in self._topic_words.items():
+            # Score based on whole-word matches, with stemming fallback for words >= 4 chars
+            score = 0
+            for w in words:
+                matched = False
+                for dw in topic_w:
+                    if w == dw or (len(w) >= 4 and (w in dw or dw in w)):
+                        matched = True
+                        break
+                if matched:
+                    score += 1
             if score > 0:
                 scored.append((topic, score))
 
@@ -103,6 +126,7 @@ class KnowledgeBase:
     def reload(self) -> None:
         """Re-scan ``knowledge_base/`` and reload all topic files."""
         self._topics.clear()
+        self._topic_words.clear()
 
         if not self.kb_dir.is_dir():
             logger.info(
@@ -119,6 +143,9 @@ class KnowledgeBase:
                 text = entry.read_text(encoding="utf-8", errors="replace").strip()
                 if text:
                     self._topics[topic] = text
+                    # Index words for faster and more precise matching
+                    topic_w = set(re.findall(r"[a-zA-Z0-9]{2,}", text.lower()))
+                    self._topic_words[topic] = topic_w
                     count += 1
                     logger.debug("Loaded topic  %s  (%d chars)", topic, len(text))
                 else:

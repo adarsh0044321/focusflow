@@ -152,10 +152,11 @@ class OCRCleaner:
 
     @staticmethod
     def _remove_garbage_lines(text: str) -> Tuple[str, int]:
-        """Drop lines where more than 50 % of characters are non-
-        alphanumeric (and non-whitespace)."""
+        """Drop lines where more than 70 % of characters are noise (i.e. keep if >= 30% are alphanumeric or math/punctuation)."""
         kept: list[str] = []
         removed = 0
+        # Common math, programming and punctuation characters that are valid in questions
+        valid_symbols = set("+-*/=<>()[]{}^_\\|,.?!&|:;")
         for line in text.splitlines():
             stripped = line.strip()
             if not stripped:
@@ -165,9 +166,10 @@ class OCRCleaner:
             if not non_ws:
                 kept.append(line)
                 continue
-            alnum_count = sum(1 for c in non_ws if c.isalnum())
-            ratio = alnum_count / len(non_ws)
-            if ratio >= 0.50:
+            # A character is valid if it is alphanumeric or a common math/programming/punctuation symbol
+            valid_count = sum(1 for c in non_ws if c.isalnum() or c in valid_symbols)
+            ratio = valid_count / len(non_ws)
+            if ratio >= 0.30:
                 kept.append(line)
             else:
                 removed += 1

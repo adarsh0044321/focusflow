@@ -75,6 +75,7 @@ from ui.pipeline_panel import PipelinePanel
 from ui.control_panel import ControlPanel
 from ui.answer_panel import AnswerPanel
 from ui.settings_dialog import SettingsDialog
+from ui.history_panel import HistoryPanel
 
 
 class FocusFlowApp:
@@ -95,6 +96,7 @@ class FocusFlowApp:
         self._solving = threading.Lock()
         self._ai_init_lock = threading.Lock()
         self._settings_dialog = None
+        self._history_panel = None
 
         # ── Tkinter root ─────────────────────────────────────────────
         self.root = tk.Tk()
@@ -186,6 +188,7 @@ class FocusFlowApp:
         # ── Wire up callbacks ────────────────────────────────────────
         self.controls.set_on_solve(self._on_solve)
         self.controls.set_on_region(self._on_region_select)
+        self.controls.set_on_history(self._on_history)
         self.controls.set_on_settings(self._on_settings)
         self.controls.set_mode_callback(self._on_mode_change)
         self.controls.set_on_manual_send(self._on_manual_send_click)
@@ -353,9 +356,10 @@ class FocusFlowApp:
                 return
 
             # 2. Save screenshot if enabled
+            screenshot_path = ""
             if self.config.get("save_screenshot_history"):
                 timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-                self.history.save_screenshot(image, timestamp)
+                screenshot_path = self.history.save_screenshot(image, timestamp)
 
             # 3. OCR
             t_ocr = time.perf_counter()
@@ -403,6 +407,7 @@ class FocusFlowApp:
             # 6. Save to history
             entry = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "screenshot_path": screenshot_path,
                 "raw_ocr": raw_text,
                 "cleaned_ocr": cleaned_text,
                 "answer": answer,
@@ -515,6 +520,35 @@ class FocusFlowApp:
             self.root.after(200, lambda: self.guard.protect_all_tk_windows(self._settings_dialog))
         except Exception as e:
             logger.error(f"[Settings] Error opening: {e}")
+
+    def _on_history(self) -> None:
+        """Open history panel."""
+        if self._history_panel is not None and self._history_panel.winfo_exists():
+            try:
+                self._history_panel.lift()
+                self._history_panel.focus_force()
+                self._history_panel.refresh()
+            except Exception:
+                pass
+            return
+
+        try:
+            self._history_panel = HistoryPanel(
+                self.root,
+                self.history,
+                self.config,
+                on_restore=self._on_history_restore
+            )
+            # Protect the history window too
+            self.root.after(200, lambda: self.guard.protect_all_tk_windows(self._history_panel))
+        except Exception as e:
+            logger.error(f"[History] Error opening: {e}")
+
+    def _on_history_restore(self, ocr_text: str, answer_text: str) -> None:
+        """Restore past interaction text and answer into the UI."""
+        self._set_answer_safe(answer_text)
+        self.pipeline.log("\n--- Restored Past Solve ---")
+        self._log_safe(f"Question (OCR):\n{ocr_text[:150]}...")
 
     def _on_settings_saved(self) -> None:
         """Apply newly saved settings immediately to running app."""

@@ -174,28 +174,17 @@ class PipelinePanel(tk.Frame):
     # ------------------------------------------------------------------
 
     def set_ocr_status(self, message: str, ready: bool = True) -> None:
-        """Update the OCR status indicator and text.
-
-        Args:
-            message: Human-readable status string, e.g. ``"Ready"`` or
-                     ``"Not Found"``.
-            ready:   ``True`` → green dot, ``False`` → red dot.
-        """
+        """Update the OCR status indicator and text."""
         color = FG_GREEN if ready else FG_RED
         self._ocr_dot.configure(fg=color)
-        self._ocr_label.configure(text=f"  OCR: {message}")
+        clean_msg = message.strip()
+        if clean_msg.upper().startswith("OCR:"):
+            clean_msg = clean_msg[4:].strip()
+        self._ocr_label.configure(text=f"  OCR: {clean_msg}")
         logger.debug("OCR status -> %s (ready=%s)", message, ready)
 
     def set_llm_status(self, message: str, ready: bool = True) -> None:
-        """Update the LLM status indicator and text.
-
-        Args:
-            message: Human-readable status string, e.g. ``"Ready"``,
-                     ``"Loading..."``, or ``"Error"``.
-            ready:   ``True`` -> green dot, ``False`` -> red dot.
-                     When *message* contains ``"load"`` (case-insensitive) and
-                     *ready* is ``False``, an amber dot is shown instead.
-        """
+        """Update the LLM status indicator and text."""
         if not ready and "load" in message.lower():
             color = FG_GOLD  # amber while loading
         elif ready:
@@ -203,7 +192,10 @@ class PipelinePanel(tk.Frame):
         else:
             color = FG_RED
         self._llm_dot.configure(fg=color)
-        self._llm_label.configure(text=f"  LLM: {message}")
+        clean_msg = message.strip()
+        if clean_msg.upper().startswith("LLM:"):
+            clean_msg = clean_msg[4:].strip()
+        self._llm_label.configure(text=f"  LLM: {clean_msg}")
         logger.debug("LLM status -> %s (ready=%s)", message, ready)
 
     def log(self, message: str) -> None:
