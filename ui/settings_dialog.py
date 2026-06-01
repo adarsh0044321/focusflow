@@ -33,7 +33,7 @@ FONT_TITLE = ("Consolas", 12, "bold")
 FONT_SMALL = ("Consolas", 9)
 
 # Available online models
-ONLINE_MODELS: list[str] = ["gpt-5"]
+ONLINE_MODELS: list[str] = ["gpt-4o", "gpt-4o-mini", "o1-mini", "gpt-5"]
 
 
 def _themed_labelframe(parent: tk.Misc, text: str) -> tk.LabelFrame:
@@ -86,7 +86,7 @@ class SettingsDialog(tk.Toplevel):
         self._send_mode_var = tk.StringVar(
             value=config.get("online_send_mode", "ocr")
         )
-        self._model_var = tk.StringVar(value=config.get("online_model", "gpt-5"))
+        self._model_var = tk.StringVar(value=config.get("online_model", "gpt-4o"))
 
         self._model_path_var = tk.StringVar(
             value=config.get("llm_model_path", "")

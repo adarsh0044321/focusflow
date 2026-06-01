@@ -58,7 +58,7 @@ DEFAULTS: dict[str, Any] = {
     "combined_active": "offline",       # which sub-mode is active in combined
     # Online
     "online_api_keys": [],              # list of OpenAI API keys
-    "online_model": "gpt-5",
+    "online_model": "gpt-4o",
     "online_send_mode": "ocr",          # "ocr", "image", "both"
     "online_max_tokens": 1000,
     "online_temperature": 0.2,
