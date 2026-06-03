@@ -296,6 +296,28 @@ export default function Home() {
   const glowSize = useTransform(scrollYProgress, [0, 0.22, 0.46], ["320px", "480px", "620px"]);
   const glowBlur = useTransform(scrollYProgress, [0, 0.22, 0.46], ["70px", "110px", "140px"]);
 
+  // Pre-calculate hooks at the top level to conform with React Rules of Hooks
+  const distractionTransforms = distractions.map((d) => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const transX = useTransform(scrollYProgress, [0, 0.22], [0, d.dirX]);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const transY = useTransform(scrollYProgress, [0, 0.22], [0, d.dirY]);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const opacity = useTransform(scrollYProgress, [0, 0.16, 0.22], [1, 0.7, 0]);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const scale = useTransform(scrollYProgress, [0, 0.22], [1, 0.55]);
+    return { transX, transY, opacity, scale };
+  });
+
+  const rowTransforms = Array.from({ length: 7 }).map((_, row) => {
+    const rowStart = 0.74 + row * 0.015;
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const opacity = useTransform(scrollYProgress, [rowStart, rowStart + 0.06], [0, 1]);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const scale = useTransform(scrollYProgress, [rowStart, rowStart + 0.06], [0.85, 1]);
+    return { opacity, scale };
+  });
+
   return (
     <div ref={containerRef} className="relative h-[650vh] w-full bg-black text-white font-sans overflow-x-hidden selection:bg-blue-500/20 selection:text-blue-200">
       
@@ -377,10 +399,7 @@ export default function Home() {
 
         {/* Chaos Floating Warning Cards */}
         {scrollVal < 0.24 && distractions.map((d, i) => {
-          const transX = useTransform(scrollYProgress, [0, 0.22], [0, d.dirX]);
-          const transY = useTransform(scrollYProgress, [0, 0.22], [0, d.dirY]);
-          const opacity = useTransform(scrollYProgress, [0, 0.16, 0.22], [1, 0.7, 0]);
-          const scale = useTransform(scrollYProgress, [0, 0.22], [1, 0.55]);
+          const t = distractionTransforms[i];
 
           return (
             <motion.div
@@ -389,10 +408,10 @@ export default function Home() {
                 left: d.x,
                 top: d.y,
                 rotate: d.rotate,
-                x: transX,
-                y: transY,
-                opacity: opacity,
-                scale: scale,
+                x: t.transX,
+                y: t.transY,
+                opacity: t.opacity,
+                scale: t.scale,
               }}
               className="absolute p-4 rounded-xl border border-red-500/15 bg-red-950/20 backdrop-blur-md shadow-2xl shadow-red-500/5 text-xs text-red-300 select-none animate-shake pointer-events-none font-mono z-20 flex items-center gap-2.5 whitespace-nowrap"
             >
@@ -621,14 +640,12 @@ export default function Home() {
                   {/* Cascading Heatmap Row Generator */}
                   <div className="grid gap-1.5 py-4">
                     {Array.from({ length: 7 }).map((_, row) => {
-                      const rowStart = 0.74 + row * 0.015;
-                      const rowOpacity = useTransform(scrollYProgress, [rowStart, rowStart + 0.06], [0, 1]);
-                      const rowScale = useTransform(scrollYProgress, [rowStart, rowStart + 0.06], [0.85, 1]);
+                      const t = rowTransforms[row];
 
                       return (
                         <motion.div
                           key={row}
-                          style={{ opacity: rowOpacity, scale: rowScale }}
+                          style={{ opacity: t.opacity, scale: t.scale }}
                           className="flex gap-1.5"
                         >
                           {Array.from({ length: 15 }).map((_, col) => {

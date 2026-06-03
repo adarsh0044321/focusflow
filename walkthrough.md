@@ -38,3 +38,16 @@ All planned bug fixes, thread-safety locking, and interface enhancements have be
 - **Executable Rebuilt**: Cleaned local build caches and compiled `FocusFlow.exe` using `pyinstaller`. The rebuilt 24.4MB standalone executable was successfully compiled and copied to:
   - [C:\studytool\dist\FocusFlow.exe](file:///C:/studytool/dist/FocusFlow.exe)
   - [e:\New folder\dist\FocusFlow.exe](file:///e:/New%20folder/dist/FocusFlow.exe)
+
+## 4. Wave 11 Migration and Offline LLM Engine Fix
+
+### Workspace Consolidation & Migration
+- **Junctions Removed**: Removed directory junctions in `C:\Users\JAISINGH\.gemini\antigravity\scratch\studytool` for `data`, `llama.cpp-master`, `models`, and `Tesseract-OCR`.
+- **Full Copy/Consolidation**: Migrated the actual binaries, models (the 2.39 GB Phi-3 model), configuration, history data, and Tesseract installation directly onto the C: drive under `C:\Users\JAISINGH\.gemini\antigravity\scratch\studytool` to make the workspace entirely self-contained.
+- **Root Artifacts**: Copied historical `E:\` root logs and built binaries to a dedicated `migrated_E_root` subfolder in the C: drive workspace.
+
+### Offline LLM Server Startup Crash Resolved (`offline_engine.py`)
+- **Root Cause**: The startup arguments passed `--flash-attn` without a value, which caused `llama-server.exe` to interpret the next argument (`--log-disable`) as its value. This threw an `unknown value for --flash-attn: '--log-disable'` error and immediately crashed the server with exit code 1, leading to the looping `Server process exited unexpectedly` logs.
+- **Solution**: Updated the server launch arguments in `offline_engine.py` to specify `--flash-attn auto`. This correctly instructs `llama-server.exe` to use automatic Flash Attention and enables `--log-disable` to be parsed as its own logging flag.
+- **Validation**: Verified with a local test harness that the offline engine initializes, loads the model in ~8 seconds, successfully queries, and terminates cleanly without any log loops or process crashes.
+
