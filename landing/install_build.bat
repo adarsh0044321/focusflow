@@ -1,6 +1,0 @@
-@echo off
-set PATH=C:\Program Files\nodejs;%PATH%
-echo Installing dependencies in e:\New folder\landing...
-call npm install
-echo Building project in e:\New folder\landing...
-call npm run build
