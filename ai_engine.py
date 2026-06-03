@@ -17,15 +17,42 @@ logger = logging.getLogger("focusflow.ai_engine")
 # System prompts
 # ------------------------------------------------------------------
 
-_SYSTEM_PROMPT_BASE = (
-    "You are an expert exam solver. Given a question (possibly from OCR "
-    "with minor errors), solve it step-by-step.\n\n"
-    "Rules:\n"
-    "1. First, mentally repair any OCR errors in the question text.\n"
-    "2. Solve the problem methodically.\n"
-    "3. If options are provided, select the correct option.\n"
-    "4. Give the final answer clearly as: \"Answer: [option/value]\""
-)
+_PERSONAS = {
+    "solver": (
+        "You are an expert exam solver. Given a question (possibly from OCR "
+        "with minor errors), solve it step-by-step.\n\n"
+        "Rules:\n"
+        "1. First, mentally repair any OCR errors in the question text.\n"
+        "2. Solve the problem methodically.\n"
+        "3. If options are provided, select the correct option.\n"
+        "4. Give the final answer clearly as: \"Answer: [option/value]\""
+    ),
+    "tutor": (
+        "You are an encouraging Socratic Tutor. Your goal is to help the user learn and understand "
+        "the concepts behind their question rather than just feeding them the answer.\n\n"
+        "Rules:\n"
+        "1. Identify the core concept behind the question.\n"
+        "2. Break it down and explain the methodology step-by-step.\n"
+        "3. Ask clarifying questions or lead them to the answer logically.\n"
+        "4. DO NOT explicitly state the final answer option. Guide them so they can pick it themselves."
+    ),
+    "code": (
+        "You are a Senior Software Engineer and coding mentor. Answer technical and programming "
+        "questions with robust explanations, syntax highlighting structures, and optimized code.\n\n"
+        "Rules:\n"
+        "1. Repair any typical OCR syntax corruptions in code blocks.\n"
+        "2. Provide highly optimized, cleanly formatted code using standard Markdown blocks.\n"
+        "3. Explain the time/space complexity and best practices."
+    ),
+    "lang": (
+        "You are a Literature and Language Expert. Focus on providing rich translations, "
+        "grammatical corrections, literary context, and linguistic breakdowns.\n\n"
+        "Rules:\n"
+        "1. Fix OCR spelling and text flow corruptions.\n"
+        "2. Provide accurate translations and grammatical explanations.\n"
+        "3. Offer stylistic context and word origins if relevant."
+    )
+}
 
 _DETAIL_SUFFIX = "\n\nShow full working and explanation."
 
@@ -64,7 +91,8 @@ class AIEngine:
 
     def _build_system_prompt(self) -> str:
         """Assemble the system prompt with verbosity and knowledge context."""
-        prompt = _SYSTEM_PROMPT_BASE
+        persona_key = self.config.get("ai_persona", "solver")
+        prompt = _PERSONAS.get(persona_key, _PERSONAS["solver"])
 
         verbosity = self.config.get("answer_mode") or "concise"
         if verbosity == "concise":
@@ -215,13 +243,15 @@ class AIEngine:
         knowledge_ctx = self._get_knowledge_context(question_text)
         mode = self._effective_mode()
 
-        system_prompt = (
-            "You are an expert exam solver. Solve the following question step-by-step.\n\n"
-            "Rules:\n"
-            "1. Solve the problem methodically.\n"
-            "2. If options are provided, select the correct option.\n"
-            "3. Give the final answer clearly as: \"Answer: [option/value]\""
-        )
+        persona_key = self.config.get("ai_persona", "solver")
+        system_prompt = _PERSONAS.get(persona_key, _PERSONAS["solver"])
+        
+        # Remove OCR references for manual text solver
+        system_prompt = system_prompt.replace("Given a question (possibly from OCR with minor errors), ", "")
+        system_prompt = system_prompt.replace("1. First, mentally repair any OCR errors in the question text.\n", "")
+        system_prompt = system_prompt.replace("1. First, mentally repair any OCR errors in the question text.\n\n", "")
+        system_prompt = system_prompt.replace("Repair any typical OCR syntax corruptions in code blocks.\n", "")
+        system_prompt = system_prompt.replace("Fix OCR spelling and text flow corruptions.\n", "")
 
         verbosity = self.config.get("answer_mode") or "concise"
         if verbosity == "concise":

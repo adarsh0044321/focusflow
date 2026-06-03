@@ -87,8 +87,6 @@ class SettingsDialog(tk.Toplevel):
             value=config.get("online_send_mode", "ocr")
         )
         self._model_var = tk.StringVar(value=config.get("online_model", "gpt-4o"))
-        self._online_base_url_var = tk.StringVar(value=config.get("online_base_url", ""))
-        self._online_custom_model_var = tk.StringVar(value=config.get("online_custom_model", ""))
 
         self._model_path_var = tk.StringVar(
             value=config.get("llm_model_path", "")
@@ -130,6 +128,31 @@ class SettingsDialog(tk.Toplevel):
         self._always_top_var = tk.BooleanVar(
             value=config.get("always_on_top", True)
         )
+        self._persona_var = tk.StringVar(
+            value=config.get("ai_persona", "solver")
+        )
+
+        # Multi-monitor setup
+        self._monitor_names = ["All Monitors (Combined)"]
+        self._monitor_values = [0]
+        try:
+            import mss
+            with mss.mss() as sct:
+                for i in range(1, len(sct.monitors)):
+                    m = sct.monitors[i]
+                    self._monitor_names.append(f"Monitor {i} ({m['width']}x{m['height']})")
+                    self._monitor_values.append(i)
+        except Exception:
+            self._monitor_names.append("Monitor 1")
+            self._monitor_values.append(1)
+
+        active_idx = int(config.get("capture_monitor_index", 1))
+        if active_idx in self._monitor_values:
+            matched_name = self._monitor_names[self._monitor_values.index(active_idx)]
+        else:
+            matched_name = self._monitor_names[0]
+            
+        self._monitor_choice_var = tk.StringVar(value=matched_name)
 
         # --- Scrollable body ------------------------------------------------
         self._canvas = tk.Canvas(self, bg=BG_DARK, highlightthickness=0)
@@ -142,11 +165,17 @@ class SettingsDialog(tk.Toplevel):
             "<Configure>",
             lambda _e: self._canvas.configure(scrollregion=self._canvas.bbox("all")),
         )
-        self._canvas.create_window((0, 0), window=self._body, anchor="nw")
+        self._body_window = self._canvas.create_window((0, 0), window=self._body, anchor="nw")
         self._canvas.configure(yscrollcommand=self._scrollbar.set)
 
         self._scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self._canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # Responsive canvas resize: stretch frame to full canvas width
+        self._canvas.bind(
+            "<Configure>",
+            lambda e: self._canvas.itemconfig(self._body_window, width=e.width)
+        )
 
         # Mousewheel scrolling (bound locally to settings dialog window)
         self.bind(
@@ -195,6 +224,32 @@ class SettingsDialog(tk.Toplevel):
                 activeforeground=FG_GREEN,
                 cursor="hand2",
             ).pack(side=tk.LEFT, padx=8)
+
+        # Add Persona Selector inside Mode section
+        persona_row = tk.Frame(lf, bg=BG_DARK)
+        persona_row.pack(fill=tk.X, pady=(6, 0))
+        tk.Label(
+            persona_row, text="Persona:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
+        ).pack(side=tk.LEFT)
+
+        self._persona_map = {
+            "General Solver": "solver",
+            "Socratic Tutor": "tutor",
+            "Code Expert": "code",
+            "Language & Translation": "lang"
+        }
+        self._reverse_persona_map = {v: k for k, v in self._persona_map.items()}
+
+        display_val = self._reverse_persona_map.get(self._persona_var.get(), "General Solver")
+        self._persona_combo = ttk.Combobox(
+            persona_row,
+            values=list(self._persona_map.keys()),
+            state="readonly",
+            font=FONT_SMALL,
+            width=22
+        )
+        self._persona_combo.set(display_val)
+        self._persona_combo.pack(side=tk.LEFT, padx=6)
 
     # --- 2. Online settings ------------------------------------------------
 
@@ -286,44 +341,6 @@ class SettingsDialog(tk.Toplevel):
             width=18,
         )
         model_combo.pack(side=tk.LEFT, padx=6)
-
-        # --- Base URL Entry -------------------------------------------------
-        url_row = tk.Frame(lf, bg=BG_DARK)
-        url_row.pack(fill=tk.X, pady=(0, 4))
-        tk.Label(
-            url_row, text="Base URL:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
-        ).pack(side=tk.LEFT)
-        tk.Entry(
-            url_row,
-            textvariable=self._online_base_url_var,
-            font=FONT_SMALL,
-            fg=FG_TEXT,
-            bg=BG_INPUT,
-            insertbackground=FG_GREEN,
-            relief=tk.FLAT,
-            highlightthickness=1,
-            highlightbackground=FG_DIM,
-            highlightcolor=FG_GREEN,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 0), ipady=2)
-
-        # --- Custom Model Entry ---------------------------------------------
-        custom_model_row = tk.Frame(lf, bg=BG_DARK)
-        custom_model_row.pack(fill=tk.X, pady=(0, 4))
-        tk.Label(
-            custom_model_row, text="Custom Model:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
-        ).pack(side=tk.LEFT)
-        tk.Entry(
-            custom_model_row,
-            textvariable=self._online_custom_model_var,
-            font=FONT_SMALL,
-            fg=FG_TEXT,
-            bg=BG_INPUT,
-            insertbackground=FG_GREEN,
-            relief=tk.FLAT,
-            highlightthickness=1,
-            highlightbackground=FG_DIM,
-            highlightcolor=FG_GREEN,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 0), ipady=2)
 
         # --- Send mode ------------------------------------------------------
         send_row = tk.Frame(lf, bg=BG_DARK)
@@ -439,6 +456,23 @@ class SettingsDialog(tk.Toplevel):
                 activeforeground=FG_GREEN,
                 cursor="hand2",
             ).pack(side=tk.LEFT, padx=6)
+
+        # Monitor Selector Dropdown
+        monitor_row = tk.Frame(lf, bg=BG_DARK)
+        monitor_row.pack(fill=tk.X, pady=(0, 6))
+        tk.Label(
+            monitor_row, text="Fullscreen Screen:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
+        ).pack(side=tk.LEFT)
+
+        monitor_combo = ttk.Combobox(
+            monitor_row,
+            textvariable=self._monitor_choice_var,
+            values=self._monitor_names,
+            state="readonly",
+            font=FONT_SMALL,
+            width=26
+        )
+        monitor_combo.pack(side=tk.LEFT, padx=6)
 
         # Region coordinate spinboxes
         coord_row = tk.Frame(lf, bg=BG_DARK)
@@ -658,33 +692,46 @@ class SettingsDialog(tk.Toplevel):
 
     def _save_and_close(self) -> None:
         """Write all widget values back to config and close."""
+        def get_int_safe(var: tk.Variable, fallback: int) -> int:
+            try:
+                val = var.get()
+                return int(val)
+            except Exception:
+                return fallback
+
         try:
             updates = {
                 "mode": self._mode_var.get(),
                 "online_model": self._model_var.get(),
                 "online_send_mode": self._send_mode_var.get(),
-                "online_base_url": self._online_base_url_var.get(),
-                "online_custom_model": self._online_custom_model_var.get(),
                 "llm_model_path": self._model_path_var.get(),
-                "llm_threads": self._threads_var.get(),
-                "llm_gpu_layers": self._gpu_layers_var.get(),
-                "llm_context_length": self._ctx_len_var.get(),
+                "llm_threads": get_int_safe(self._threads_var, 4),
+                "llm_gpu_layers": get_int_safe(self._gpu_layers_var, 0),
+                "llm_context_length": get_int_safe(self._ctx_len_var, 2048),
                 "capture_mode": self._capture_mode_var.get(),
-                "region_x": self._region_x_var.get(),
-                "region_y": self._region_y_var.get(),
-                "region_w": self._region_w_var.get(),
-                "region_h": self._region_h_var.get(),
+                "region_x": get_int_safe(self._region_x_var, 0),
+                "region_y": get_int_safe(self._region_y_var, 0),
+                "region_w": get_int_safe(self._region_w_var, 800),
+                "region_h": get_int_safe(self._region_h_var, 600),
                 "ocr_preprocess_grayscale": self._gray_var.get(),
                 "ocr_preprocess_contrast": self._contrast_var.get(),
                 "ocr_preprocess_sharpen": self._sharpen_var.get(),
                 "ocr_preprocess_denoise": self._denoise_var.get(),
                 "ocr_preprocess_threshold": self._threshold_var.get(),
-                "opacity": self._opacity_var.get(),
+                "opacity": get_int_safe(self._opacity_var, 240),
                 "answer_mode": self._answer_mode_var.get(),
                 "always_on_top": self._always_top_var.get(),
+                "ai_persona": self._persona_map.get(self._persona_combo.get(), "solver"),
+                "capture_monitor_index": self._monitor_values[self._monitor_names.index(self._monitor_choice_var.get())] if self._monitor_choice_var.get() in self._monitor_names else 1,
             }
+
+            # Additional validation on region dimensions and opacity bounds
+            updates["region_w"] = max(10, updates["region_w"])
+            updates["region_h"] = max(10, updates["region_h"])
+            updates["opacity"] = max(30, min(255, updates["opacity"]))
+
             self.config.batch_update(updates)
-            logger.info("Settings saved via dialog batch update")
+            logger.info("Settings saved via dialog batch update with input validation")
         except Exception:
             logger.exception("Error saving settings")
 

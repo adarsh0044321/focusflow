@@ -132,7 +132,18 @@ class AnswerPanel(tk.Frame):
             command=self._handle_clear,
             **btn_style,
         )
-        self._btn_clear.pack(side=tk.LEFT)
+        self._btn_clear.pack(side=tk.LEFT, padx=(0, 6))
+
+        self._btn_copy = tk.Button(
+            btn_frame,
+            text="📋 Copy",
+            bg=ACCENT_PURPLE,
+            fg=FG_TEXT,
+            activebackground="#611cc9",
+            command=self._handle_copy,
+            **btn_style,
+        )
+        self._btn_copy.pack(side=tk.LEFT)
 
         # ---- System message -------------------------------------------
         self._sys_msg_label = tk.Label(
@@ -232,6 +243,19 @@ class AnswerPanel(tk.Frame):
                 self._on_clear()
             except Exception as exc:
                 logger.error("Clear callback error: %s", exc)
+
+    def _handle_copy(self) -> None:
+        try:
+            text = self._answer_area.get("1.0", tk.END).strip()
+            if text:
+                self.clipboard_clear()
+                self.clipboard_append(text)
+                self.set_system_message("[System] Copied to clipboard!")
+                logger.info("Copied answer to clipboard")
+            else:
+                self.set_system_message("[System] No answer to copy.")
+        except Exception as exc:
+            logger.error("Failed to copy to clipboard: %s", exc)
 
     # ------------------------------------------------------------------
     # Public API

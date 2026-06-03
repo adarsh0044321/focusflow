@@ -62,8 +62,6 @@ DEFAULTS: dict[str, Any] = {
     "online_send_mode": "ocr",          # "ocr", "image", "both"
     "online_max_tokens": 1000,
     "online_temperature": 0.2,
-    "online_base_url": "",              # custom endpoint for OpenAI-compatible APIs (Ollama, DeepSeek, Groq)
-    "online_custom_model": "",          # custom model name to override the online_model dropdown selection
     # Answer
     "answer_mode": "concise",           # "concise" or "detailed"
     # UI

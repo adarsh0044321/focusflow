@@ -35,15 +35,12 @@ class ScreenCapture:
         Parameters
         ----------
         monitor_index:
-            1-based index into ``mss.monitors``.  Index 0 is the
+            0-based or 1-based index into ``mss.monitors``.  Index 0 is the
             virtual screen that spans *all* monitors.
         """
         with mss.mss() as sct:
-            if self.config.get("capture_all_screens"):
-                raw = sct.grab(sct.monitors[0])  # all monitors combined
-            else:
-                idx = min(monitor_index, len(sct.monitors) - 1)
-                raw = sct.grab(sct.monitors[idx])
+            idx = min(max(0, monitor_index), len(sct.monitors) - 1)
+            raw = sct.grab(sct.monitors[idx])
             return Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
 
     def capture_region(self) -> Image.Image:
@@ -79,7 +76,8 @@ class ScreenCapture:
         mode: str = self.config.get("capture_mode", "fullscreen")
         if mode == "region":
             return self.capture_region()
-        return self.capture_fullscreen()
+        monitor_idx = int(self.config.get("capture_monitor_index", 1))
+        return self.capture_fullscreen(monitor_index=monitor_idx)
 
     # ------------------------------------------------------------------
     # Interactive region selector

@@ -42,15 +42,9 @@ class OnlineEngine:
             if not keys:
                 raise ValueError("No API keys configured. Add keys in Settings -> Online.")
             key = keys[self._key_index % len(keys)]
-            
-            base_url = self.config.get("online_base_url", "").strip() or None
-            client_cache_key = (key, base_url or "")
-            if client_cache_key not in self._clients:
-                kwargs = {"api_key": key}
-                if base_url:
-                    kwargs["base_url"] = base_url
-                self._clients[client_cache_key] = OpenAI(**kwargs)
-            return self._clients[client_cache_key], key
+            if key not in self._clients:
+                self._clients[key] = OpenAI(api_key=key)
+            return self._clients[key], key
 
     def _rotate_key(self) -> None:
         """Advance to the next configured API key."""
@@ -133,30 +127,33 @@ class OnlineEngine:
         temperature: float,
     ) -> str:
         """Send query using responses API with fallback to chat completions."""
-        try:
-            # Try custom/deprecated responses API format
-            response = client.responses.create(
-                model=model,
-                input=messages_or_input,
-            )
-            if response and getattr(response, "output_text", None):
-                return response.output_text.strip()
-        except AttributeError:
-            # Standard OpenAI chat completions fallback
-            if isinstance(messages_or_input, str):
-                chat_messages = [{"role": "user", "content": messages_or_input}]
-            else:
-                # messages_or_input is already structured payload list
-                chat_messages = [{"role": "user", "content": messages_or_input}]
+        if hasattr(client, "responses") and hasattr(client.responses, "create"):
+            try:
+                # Try custom/deprecated responses API format
+                response = client.responses.create(
+                    model=model,
+                    input=messages_or_input,
+                )
+                if response and getattr(response, "output_text", None):
+                    return response.output_text.strip()
+            except Exception as exc:
+                self.logger.warning(f"[API] Custom responses API failed: {exc}. Falling back.")
 
-            response = client.chat.completions.create(
-                model=model,
-                messages=chat_messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-            if response and response.choices and response.choices[0].message.content:
-                return response.choices[0].message.content.strip()
+        # Standard OpenAI chat completions fallback
+        if isinstance(messages_or_input, str):
+            chat_messages = [{"role": "user", "content": messages_or_input}]
+        else:
+            # messages_or_input is already structured payload list
+            chat_messages = [{"role": "user", "content": messages_or_input}]
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=chat_messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        if response and response.choices and response.choices[0].message.content:
+            return response.choices[0].message.content.strip()
         return ""
 
     # ------------------------------------------------------------------
@@ -168,8 +165,7 @@ class OnlineEngine:
 
         Automatically rotates keys on rate-limit / quota errors.
         """
-        custom_model = self.config.get("online_custom_model", "").strip()
-        model: str = custom_model if custom_model else self.config.get("online_model", "gpt-4o")
+        model: str = self.config.get("online_model", "gpt-4o")
         max_tokens: int = int(self.config.get("online_max_tokens", 1000))
         temperature: float = float(self.config.get("online_temperature", 0.2))
 
@@ -250,8 +246,7 @@ class OnlineEngine:
 
         *image_pil* should be a ``PIL.Image.Image`` instance.
         """
-        custom_model = self.config.get("online_custom_model", "").strip()
-        model: str = custom_model if custom_model else self.config.get("online_model", "gpt-4o")
+        model: str = self.config.get("online_model", "gpt-4o")
         max_tokens: int = int(self.config.get("online_max_tokens", 1000))
         temperature: float = float(self.config.get("online_temperature", 0.2))
 

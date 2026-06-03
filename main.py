@@ -75,7 +75,6 @@ from ui.pipeline_panel import PipelinePanel
 from ui.control_panel import ControlPanel
 from ui.answer_panel import AnswerPanel
 from ui.settings_dialog import SettingsDialog
-from ui.history_panel import HistoryPanel
 
 
 class FocusFlowApp:
@@ -96,7 +95,7 @@ class FocusFlowApp:
         self._solving = threading.Lock()
         self._ai_init_lock = threading.Lock()
         self._settings_dialog = None
-        self._history_panel = None
+        self._history_dialog = None
 
         # ── Tkinter root ─────────────────────────────────────────────
         self.root = tk.Tk()
@@ -188,8 +187,8 @@ class FocusFlowApp:
         # ── Wire up callbacks ────────────────────────────────────────
         self.controls.set_on_solve(self._on_solve)
         self.controls.set_on_region(self._on_region_select)
-        self.controls.set_on_history(self._on_history)
         self.controls.set_on_settings(self._on_settings)
+        self.controls.set_on_history(self._on_history)
         self.controls.set_mode_callback(self._on_mode_change)
         self.controls.set_on_manual_send(self._on_manual_send_click)
 
@@ -445,6 +444,10 @@ class FocusFlowApp:
 
     def _solve_manual_text(self, question: str) -> None:
         """Common helper to solve manual questions in a background thread."""
+        if not self._solving.acquire(blocking=False):
+            logger.warning("[Solve] Skip manual question — solver already busy")
+            self.pipeline.log("[Solve] Skip manual question — solver already busy")
+            return
         self.pipeline.log(f"\n--- Manual Question ---\n{question[:100]}...")
         self.answer.set_system_message("[System] Processing manual question...")
 
@@ -475,6 +478,8 @@ class FocusFlowApp:
             except Exception as e:
                 logger.error(f"[Solve] Manual solve crashed: {e}")
                 self._set_answer_safe(f"[Error] Manual solve crashed: {e}")
+            finally:
+                self._solving.release()
 
         threading.Thread(target=_solve, daemon=True).start()
 
@@ -522,33 +527,25 @@ class FocusFlowApp:
             logger.error(f"[Settings] Error opening: {e}")
 
     def _on_history(self) -> None:
-        """Open history panel."""
-        if self._history_panel is not None and self._history_panel.winfo_exists():
+        """Open history viewer dialog."""
+        if self._history_dialog is not None and self._history_dialog.winfo_exists():
             try:
-                self._history_panel.lift()
-                self._history_panel.focus_force()
-                self._history_panel.refresh()
+                self._history_dialog.lift()
+                self._history_dialog.focus_force()
+                self._history_dialog.reload_history()
             except Exception:
                 pass
             return
 
         try:
-            self._history_panel = HistoryPanel(
+            from ui.history_viewer import HistoryViewerDialog
+            self._history_dialog = HistoryViewerDialog(
                 self.root,
                 self.history,
-                self.config,
-                on_restore=self._on_history_restore
+                self.guard
             )
-            # Protect the history window too
-            self.root.after(200, lambda: self.guard.protect_all_tk_windows(self._history_panel))
         except Exception as e:
-            logger.error(f"[History] Error opening: {e}")
-
-    def _on_history_restore(self, ocr_text: str, answer_text: str) -> None:
-        """Restore past interaction text and answer into the UI."""
-        self._set_answer_safe(answer_text)
-        self.pipeline.log("\n--- Restored Past Solve ---")
-        self._log_safe(f"Question (OCR):\n{ocr_text[:150]}...")
+            logger.error(f"[History] Error opening viewer: {e}")
 
     def _on_settings_saved(self) -> None:
         """Apply newly saved settings immediately to running app."""

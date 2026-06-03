@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import tkinter as tk
+from tkinter import ttk
 from typing import Any, Callable, Optional
 
 logger = logging.getLogger("focusflow.control_panel")
@@ -49,8 +50,8 @@ class ControlPanel(tk.Toplevel):
         # --- Callbacks (set later via public helpers) -----------------------
         self._on_solve: Optional[Callable[[], None]] = None
         self._on_region: Optional[Callable[[], None]] = None
-        self._on_history: Optional[Callable[[], None]] = None
         self._on_settings: Optional[Callable[[], None]] = None
+        self._on_history: Optional[Callable[[], None]] = None
         self._on_manual_send: Optional[Callable[[str], None]] = None
         self._on_mode_change: Optional[Callable[[str, Optional[str]], None]] = None
 
@@ -66,6 +67,7 @@ class ControlPanel(tk.Toplevel):
         self._build_hotkey_reference()
         self._build_mode_tabs()
         self._build_mode_selector()
+        self._build_persona_selector()
         self._build_region_info()
         self._build_online_options()
         self._build_manual_input()
@@ -230,6 +232,42 @@ class ControlPanel(tk.Toplevel):
                 cursor="hand2",
             )
             rb.pack(side=tk.LEFT, padx=6)
+
+    def _build_persona_selector(self) -> None:
+        frame = tk.Frame(self, bg=BG_DARK, padx=10, pady=4)
+        frame.pack(fill=tk.X)
+
+        tk.Label(
+            frame, text="Persona:", font=FONT_MAIN, fg=FG_TEXT, bg=BG_DARK
+        ).pack(side=tk.LEFT)
+
+        self._persona_var = tk.StringVar(value=self.config.get("ai_persona", "solver"))
+        
+        self._persona_map = {
+            "General Solver": "solver",
+            "Socratic Tutor": "tutor",
+            "Code Expert": "code",
+            "Language & Translation": "lang"
+        }
+        self._reverse_persona_map = {v: k for k, v in self._persona_map.items()}
+
+        display_val = self._reverse_persona_map.get(self._persona_var.get(), "General Solver")
+        self._persona_combo = ttk.Combobox(
+            frame,
+            values=list(self._persona_map.keys()),
+            state="readonly",
+            font=FONT_SMALL,
+            width=22
+        )
+        self._persona_combo.set(display_val)
+        self._persona_combo.pack(side=tk.LEFT, padx=8)
+        self._persona_combo.bind("<<ComboboxSelected>>", self._handle_persona_select)
+
+    def _handle_persona_select(self, event: Optional[tk.Event] = None) -> None:
+        display_name = self._persona_combo.get()
+        code_name = self._persona_map.get(display_name, "solver")
+        self.config.set("ai_persona", code_name)
+        logger.info(f"AI Persona changed to: {code_name}")
 
     # ======================================================================
     # Region info line

@@ -116,14 +116,16 @@ class OfflineEngine:
             return
 
         if self._port_in_use(port):
-            # Check if it's a healthy llama-server
+            # Check if the existing server is responsive and healthy
+            url = f"http://127.0.0.1:{port}/health"
             try:
-                resp = requests.get(f"http://127.0.0.1:{port}/health", timeout=2.0)
+                resp = requests.get(url, timeout=2.0)
                 if resp.status_code == 200:
+                    self.logger.info(f"[LLM] Port {port} in use by a healthy llama-server. Adopting it.")
                     self._ready_event.set()
-                    self._set_status("LLM: Model loaded and ready! (reused)")
-                    self.logger.info(f"[LLM] Port {port} is in use by a healthy llama-server. Reusing it.")
-                    # Start health-monitoring thread to keep monitoring responsiveness
+                    self._set_status("LLM: Model loaded and ready! (Existing server)")
+                    
+                    # Start health monitoring for the adopted server
                     self._stop_event.clear()
                     self._health_thread = threading.Thread(
                         target=self._poll_health,
@@ -133,7 +135,7 @@ class OfflineEngine:
                     )
                     self._health_thread.start()
                     return
-            except requests.RequestException:
+            except Exception:
                 pass
 
             self._set_status(f"Port {port} already in use")
@@ -245,7 +247,7 @@ class OfflineEngine:
             if self._stop_event.is_set():
                 break
 
-            # Check if process is still alive (if we launched one)
+            # Check if process is still alive (only for servers we launched)
             if self._server_process is not None and self._server_process.poll() is not None:
                 self._ready_event.clear()
                 self._set_status("Server crashed")
