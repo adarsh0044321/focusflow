@@ -484,19 +484,19 @@ export default function Home() {
   const glowFilter = useMotionTemplate`blur(${glowBlur})`;
 
   return (
-    <div ref={containerRef} className="relative h-[650vh] w-full bg-black text-white font-sans overflow-x-hidden selection:bg-blue-500/20 selection:text-blue-200">
+    <div ref={containerRef} className="relative h-[650vh] w-full bg-black text-white font-sans selection:bg-blue-500/20 selection:text-blue-200">
       
       {/* Sticky Viewport Container */}
-      <div className="sticky top-0 h-screen w-screen overflow-hidden flex flex-col items-center justify-center relative">
+      <div className="sticky top-0 h-screen w-full overflow-hidden flex flex-col items-center justify-center">
         
         {/* Dynamic Background Grids */}
         <motion.div style={{ opacity: gridChaosOpacity }} className="absolute inset-0 bg-grid-chaos pointer-events-none z-0" />
         <motion.div style={{ opacity: gridCalmOpacity }} className="absolute inset-0 bg-grid-overlay pointer-events-none z-0" />
-
+ 
         {/* Ambient static lighting */}
         <div className="absolute top-[-10%] left-[-15%] w-[60%] h-[60%] bg-blue-500/10 rounded-full blur-[180px] pointer-events-none z-0" />
         <div className="absolute bottom-[-10%] right-[-15%] w-[60%] h-[60%] bg-purple-500/5 rounded-full blur-[180px] pointer-events-none z-0" />
-
+ 
         {/* 2 AM Desk Lamp / HUD follow glow */}
         <motion.div
           style={{
@@ -513,16 +513,14 @@ export default function Home() {
             scrollVal < 0.22 ? "animate-flicker" : ""
           }`}
         />
-
+ 
         {/* Orbiting particles background */}
         <CalmOrbitBackground scrollProgress={scrollVal} />
-
+ 
         {/* --- HEADER --- */}
         <header className="absolute top-0 left-0 w-full z-50 p-8 flex items-center justify-between border-b border-white/5 bg-black/20 backdrop-blur-md">
           <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center border border-white/10 shadow-lg">
-              <Zap className="w-3.5 h-3.5 text-white" />
-            </div>
+            <img src="/logo.png" alt="FocusFlow Logo" className="w-6 h-6 rounded-md border border-white/10 shadow-lg object-cover" />
             <span className="font-bold text-sm tracking-tight text-white font-mono">FocusFlow</span>
           </div>
           
