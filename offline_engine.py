@@ -160,7 +160,7 @@ class OfflineEngine:
             "--threads", str(threads),
             "--n-gpu-layers", str(gpu),
             "--host", "127.0.0.1",
-            "--flash-attn",
+            "--flash-attn", "auto",
             "--log-disable",
         ]
 

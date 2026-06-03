@@ -59,6 +59,38 @@ graph TD
 
 ---
 
+## 🌐 Premium SaaS Landing Page
+
+The repository includes a world-class, premium SaaS landing page located in the `landing/` directory. It is designed to look custom-built, futuristic, and highly interactive.
+
+### Features
+- **Mouse-Reactive Follow Glow**: An ambient light glow that tracks the user's mouse pointer using GPU-accelerated springs (`framer-motion`).
+- **Canvas Particle Background**: A floating particle field written using pure Canvas and HTML5 2D contexts for high-performance 60fps animations.
+- **Active Pomodoro Widget**: A fully interactive desktop-like Pomodoro timer in the hero section that can be started, paused, and reset.
+- **Dynamic Metrics Charts**: Multi-tab SVG line graphs showing study progress, focus scores, and distraction count with animated transition paths.
+- **Study Heatmap Grid**: Hover-interactive grid depicting study consistency across days and weeks, with floating hover tooltips.
+- **Perspective Sandbox Carousel**: Auto-scrolling slides demonstrating core product interfaces (Stealth HUD, Socratic Tutor, Search History) using perspective rotates.
+
+### Technology Stack
+- **Framework**: Next.js 16 (App Router, Turbopack) & TypeScript
+- **Styling**: TailwindCSS v4 with glassmorphism overlays and ambient glow effects
+- **Animations**: Framer Motion & HTML5 Canvas
+
+### Running Locally
+To launch the landing page locally:
+1. Navigate to the `landing/` folder.
+2. Install the dependencies and compile the production build:
+   ```powershell
+   npm install
+   npm run build
+   ```
+3. Run the development server:
+   ```powershell
+   npm run dev
+   ```
+
+---
+
 ## 🚀 Setup & Installation
 
 ### Option A: Standalone Executable (Recommended)
