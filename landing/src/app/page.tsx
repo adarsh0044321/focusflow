@@ -472,8 +472,8 @@ export default function Home() {
   const flameScale = useTransform(scrollYProgress, [0.76, 0.90], [0.88, 1.25]);
 
   // Phase 5 (Final Editorial CTA)
-  const finalCtaOpacity = useTransform(scrollYProgress, [0.91, 0.96], [0, 1]);
-  const finalCtaScale = useTransform(scrollYProgress, [0.91, 0.96], [0.96, 1]);
+  const ctaOpacity = scrollVal >= 0.96 ? 1 : scrollVal <= 0.91 ? 0 : (scrollVal - 0.91) / 0.05;
+  const ctaScale = scrollVal >= 0.96 ? 1 : scrollVal <= 0.91 ? 0.96 : 0.96 + 0.04 * ((scrollVal - 0.91) / 0.05);
 
   // Dynamic Cursor glow styling ( desk lamp transitions to command center )
   const glowColor = useTransform(scrollYProgress, [0, 0.22, 0.46], ["rgba(245, 158, 11, 0.16)", "rgba(0, 119, 255, 0.15)", "rgba(123, 47, 247, 0.08)"]);
@@ -648,7 +648,7 @@ export default function Home() {
                 opacity: appWorkspaceOpacity,
                 scale: appWorkspaceScale,
               }}
-              className="absolute w-full max-w-5xl h-[480px] p-2 flex flex-col justify-between z-10"
+              className="absolute w-full max-w-5xl h-[480px] p-2 flex flex-col justify-between z-30"
             >
               {/* Assembling Top Bar */}
               <motion.div
@@ -807,7 +807,7 @@ export default function Home() {
                 opacity: masteryDashboardOpacity,
                 scale: masteryDashboardScale,
               }}
-              className="absolute w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8 z-10"
+              className="absolute w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8 z-30"
             >
               
               {/* Left Column: Consistency Heatmap & Streak Counter */}
@@ -894,66 +894,64 @@ export default function Home() {
         {/* ======================================================== */}
         {/* PHASE 5: THE IIT MOMENTUM CTA & MINIMAL DOWNLOAD (0.90 - 1.0) */}
         {/* ======================================================== */}
-        <AnimatePresence>
-          {scrollVal >= 0.90 && (
-            <motion.div
-              style={{
-                opacity: finalCtaOpacity,
-                scale: finalCtaScale,
-              }}
-              className="absolute flex flex-col items-center justify-center text-center px-6 max-w-4xl z-10"
+        <motion.div
+          style={{
+            opacity: ctaOpacity,
+            scale: ctaScale,
+          }}
+          className={`absolute flex flex-col items-center justify-center text-center px-6 max-w-4xl z-30 ${
+            scrollVal >= 0.90 ? "pointer-events-auto" : "pointer-events-none"
+          }`}
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-[10px] text-blue-400 font-medium font-mono mb-6">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>COMMAND CENTER LOCK ENGAGED</span>
+          </div>
+          
+          <h2 className="text-5xl sm:text-7xl font-extrabold tracking-tighter leading-none text-white uppercase select-none font-sans">
+            Master Your <br />
+            <span className="bg-gradient-to-r from-blue-500 via-indigo-400 to-purple-500 bg-clip-text text-transparent">JEE Momentum.</span>
+          </h2>
+          
+          <p className="text-zinc-500 font-mono text-xs sm:text-sm mt-6 max-w-lg leading-relaxed select-none">
+            No notification loops. No Telegram alerts. Simply an ultra-stealth study companion built to guide competitive exam aspirants through the dark.
+          </p>
+
+          {/* Minimal download button layouts */}
+          <div className="mt-10 flex flex-col sm:flex-row items-center gap-4 justify-center w-full max-w-md">
+            <a 
+              href="https://github.com/adarsh0044321/focusflow/releases/download/v1.1.0/FocusFlow-v1.1.0-LITE.zip"
+              className="w-full sm:w-auto px-8 py-4 bg-white text-black font-mono font-bold text-xs hover:bg-zinc-200 transition duration-300 rounded-xl shadow-lg shadow-white/5 flex items-center justify-center gap-2 cursor-pointer animate-pulse"
             >
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-[10px] text-blue-400 font-medium font-mono mb-6">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>COMMAND CENTER LOCK ENGAGED</span>
-              </div>
-              
-              <h2 className="text-5xl sm:text-7xl font-extrabold tracking-tighter leading-none text-white uppercase select-none font-sans">
-                Master Your <br />
-                <span className="bg-gradient-to-r from-blue-500 via-indigo-400 to-purple-500 bg-clip-text text-transparent">JEE Momentum.</span>
-              </h2>
-              
-              <p className="text-zinc-500 font-mono text-xs sm:text-sm mt-6 max-w-lg leading-relaxed select-none">
-                No notification loops. No Telegram alerts. Simply an ultra-stealth study companion built to guide competitive exam aspirants through the dark.
-              </p>
+              <Monitor className="w-4 h-4" />
+              Download FocusFlow v1.1.0
+            </a>
+            <a 
+              href="https://github.com/adarsh0044321/focusflow" 
+              className="w-full sm:w-auto px-8 py-4 bg-zinc-950 border border-white/10 hover:border-white/20 text-zinc-300 font-mono text-xs transition rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.164 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
+              </svg>
+              Inspect Source Code
+            </a>
+          </div>
 
-              {/* Minimal download button layouts */}
-              <div className="mt-10 flex flex-col sm:flex-row items-center gap-4 justify-center w-full max-w-md">
-                <a 
-                  href="https://github.com/adarsh0044321/focusflow/releases/download/v1.1.0/FocusFlow-v1.1.0-LITE.zip"
-                  className="w-full sm:w-auto px-8 py-4 bg-white text-black font-mono font-bold text-xs hover:bg-zinc-200 transition duration-300 rounded-xl shadow-lg shadow-white/5 flex items-center justify-center gap-2 cursor-pointer animate-pulse"
-                >
-                  <Monitor className="w-4 h-4" />
-                  Download FocusFlow v1.1.0
-                </a>
-                <a 
-                  href="https://github.com/adarsh0044321/focusflow" 
-                  className="w-full sm:w-auto px-8 py-4 bg-zinc-950 border border-white/10 hover:border-white/20 text-zinc-300 font-mono text-xs transition rounded-xl flex items-center justify-center gap-2 cursor-pointer"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.164 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
-                  </svg>
-                  Inspect Source Code
-                </a>
-              </div>
+          <div className="text-[10px] text-zinc-650 font-mono mt-6 flex items-center justify-center gap-4 select-none">
+            <span>Compatible with Windows 10 / 11</span>
+            <span>·</span>
+            <span>Open Source under MIT</span>
+          </div>
 
-              <div className="text-[10px] text-zinc-650 font-mono mt-6 flex items-center justify-center gap-4 select-none">
-                <span>Compatible with Windows 10 / 11</span>
-                <span>·</span>
-                <span>Open Source under MIT</span>
-              </div>
+          {/* Minimalist Footer inside CTA */}
+          <div className="mt-20 border-t border-white/5 pt-8 w-full max-w-md text-[9px] font-mono text-zinc-750 flex justify-between select-none">
+            <span>&copy; {new Date().getFullYear()} FocusFlow.</span>
+            <span>Created for deep study focus.</span>
+          </div>
 
-              {/* Minimalist Footer inside CTA */}
-              <div className="mt-20 border-t border-white/5 pt-8 w-full max-w-md text-[9px] font-mono text-zinc-750 flex justify-between select-none">
-                <span>&copy; {new Date().getFullYear()} FocusFlow.</span>
-                <span>Created for deep study focus.</span>
-              </div>
-
-            </motion.div>
-          )}
-        </AnimatePresence>
+        </motion.div>
 
       </div>
 
