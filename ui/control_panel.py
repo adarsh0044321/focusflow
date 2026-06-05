@@ -489,7 +489,11 @@ class ControlPanel(tk.Toplevel):
 
     def update_region_display(self, w: int, h: int) -> None:
         """Update the region dimensions text."""
-        self._region_text_var.set(f"Mode: Region ({w}×{h})")
+        capture_mode = self.config.get("capture_mode", "fullscreen")
+        if capture_mode == "region":
+            self._region_text_var.set(f"Capture Area: Region ({w}×{h})")
+        else:
+            self._region_text_var.set("Capture Area: Fullscreen")
 
     def get_manual_text(self) -> str:
         """Return the current text from the manual question input."""

@@ -23,6 +23,18 @@ import os
 import sys
 import threading
 import time
+
+# ── Initialize DPI awareness on Windows ──────────────────────────────────
+if sys.platform == "win32":
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
 import tkinter as tk
 from pathlib import Path
 from typing import Optional
@@ -108,7 +120,8 @@ class FocusFlowApp:
         self._create_panels()
 
         # ── Screen capture guard ─────────────────────────────────────
-        self.root.after(500, self._init_guard)
+        self.root.update_idletasks()
+        self._init_guard()
 
         # ── Global hotkeys ───────────────────────────────────────────
         self._register_hotkeys()
@@ -522,7 +535,8 @@ class FocusFlowApp:
                 on_opacity_preview=self._set_opacity
             )
             # Protect the settings window too
-            self.root.after(200, lambda: self.guard.protect_all_tk_windows(self._settings_dialog))
+            self._settings_dialog.update_idletasks()
+            self.guard.protect_all_tk_windows(self._settings_dialog)
         except Exception as e:
             logger.error(f"[Settings] Error opening: {e}")
 
@@ -613,11 +627,12 @@ class FocusFlowApp:
         for win in self._windows:
             try:
                 win.deiconify()
+                win.update_idletasks()
             except Exception:
                 pass
         self._panels_visible = True
         # Reapply guard
-        self.root.after(200, self._init_guard)
+        self._init_guard()
 
     def _on_toggle_panels_hotkey(self) -> None:
         """Safe wrapper for toggle hotkey."""

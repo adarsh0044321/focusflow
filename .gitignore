@@ -49,6 +49,7 @@ venv.bak/
 
 # FocusFlow specific runtime data
 data/settings.json
+data/settings.json.bak
 data/history.json
 data/history.backup.json
 data/screenshots/
@@ -67,7 +68,6 @@ svchost.exe
 FocusFlow-Publisher.cer
 
 # Built packages and spec files
-FocusFlow-v1.0.0-FullRelease.zip
-FocusFlow-v1.0.0-FullRelease.zip.*
-FocusFlow-v1.0.0-LITE.zip
+FocusFlow-v*.zip
+FocusFlow-v*.zip.*
 FocusFlow.spec

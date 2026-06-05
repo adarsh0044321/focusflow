@@ -140,7 +140,24 @@ class _RegionSelector:
 
         self._overlay = tk.Toplevel(self._root)
         self._overlay.title("Select Region")
-        self._overlay.attributes("-fullscreen", True)
+
+        # Get total virtual screen dimensions from mss across all monitors
+        try:
+            with mss.mss() as sct:
+                # sct.monitors[0] is the virtual monitor containing all screens
+                mon = sct.monitors[0]
+                left = mon["left"]
+                top = mon["top"]
+                width = mon["width"]
+                height = mon["height"]
+        except Exception:
+            # Fallback to single monitor if mss fails
+            left = 0
+            top = 0
+            width = self._overlay.winfo_screenwidth()
+            height = self._overlay.winfo_screenheight()
+
+        self._overlay.geometry(f"{width}x{height}+{left}+{top}")
         self._overlay.attributes("-topmost", True)
 
         # Semi-transparent overlay (Windows-specific alpha)
@@ -160,7 +177,7 @@ class _RegionSelector:
 
         # Instruction label
         self._canvas.create_text(
-            self._overlay.winfo_screenwidth() // 2,
+            width // 2,
             30,
             text="Click and drag to select a region  ·  Press Esc to cancel",
             fill="#e0e0e0",

@@ -43,7 +43,8 @@ class HistoryViewerDialog(tk.Toplevel):
         self.attributes("-topmost", True)
         
         # Apply screen capture exclusion
-        self.after(200, lambda: self.guard.protect_all_tk_windows(self))
+        self.update_idletasks()
+        self.guard.protect_all_tk_windows(self)
 
         self._entries: list[dict[str, Any]] = []
         self._filtered_entries: list[dict[str, Any]] = []
@@ -291,7 +292,8 @@ class HistoryViewerDialog(tk.Toplevel):
             popup.configure(bg=BG_DARK)
             
             # Protect popup
-            self.after(200, lambda: self.guard.protect_all_tk_windows(popup))
+            popup.update_idletasks()
+            self.guard.protect_all_tk_windows(popup)
             
             # Open and scale image to fit screen dimensions nicely
             img = Image.open(path)

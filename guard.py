@@ -146,9 +146,8 @@ class CaptureGuard:
                 dead: list[int] = []
                 for hwnd in tracked:
                     if user32.IsWindow(hwnd):
-                        if user32.IsWindowVisible(hwnd):
-                            self._apply_exclusion(hwnd)
-                            alive += 1
+                        self._apply_exclusion(hwnd)
+                        alive += 1
                     else:
                         dead.append(hwnd)
 
@@ -184,7 +183,7 @@ class CaptureGuard:
         if user32 is None:
             return False
         try:
-            if not user32.IsWindow(hwnd) or not user32.IsWindowVisible(hwnd):
+            if not user32.IsWindow(hwnd):
                 return False
             result = user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
             if not result:

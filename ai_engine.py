@@ -246,12 +246,29 @@ class AIEngine:
         persona_key = self.config.get("ai_persona", "solver")
         system_prompt = _PERSONAS.get(persona_key, _PERSONAS["solver"])
         
-        # Remove OCR references for manual text solver
+        # Remove OCR references and re-index rules for manual text solver
         system_prompt = system_prompt.replace("Given a question (possibly from OCR with minor errors), ", "")
-        system_prompt = system_prompt.replace("1. First, mentally repair any OCR errors in the question text.\n", "")
-        system_prompt = system_prompt.replace("1. First, mentally repair any OCR errors in the question text.\n\n", "")
-        system_prompt = system_prompt.replace("Repair any typical OCR syntax corruptions in code blocks.\n", "")
-        system_prompt = system_prompt.replace("Fix OCR spelling and text flow corruptions.\n", "")
+        import re
+        lines = system_prompt.splitlines()
+        cleaned_lines = []
+        rule_counter = 1
+        in_rules_section = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.lower().startswith("rules:"):
+                in_rules_section = True
+                cleaned_lines.append(line)
+                continue
+            if in_rules_section and re.match(r"^\d+\.\s", stripped):
+                if "ocr" in stripped.lower():
+                    continue
+                rule_text = re.sub(r"^\d+\.\s*", "", line)
+                leading_ws = line[:len(line) - len(line.lstrip())]
+                cleaned_lines.append(f"{leading_ws}{rule_counter}. {rule_text}")
+                rule_counter += 1
+            else:
+                cleaned_lines.append(line)
+        system_prompt = "\n".join(cleaned_lines)
 
         verbosity = self.config.get("answer_mode") or "concise"
         if verbosity == "concise":
