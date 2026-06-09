@@ -38,9 +38,10 @@ FONT_SMALL = ("Consolas", 9)
 class ControlPanel(tk.Toplevel):
     """Borderless, always-on-top control surface for FocusFlow."""
 
-    def __init__(self, parent: tk.Misc, config: Any, **kwargs: Any) -> None:
+    def __init__(self, parent: tk.Misc, config: Any, run_mode: str = "combined", **kwargs: Any) -> None:
         super().__init__(parent, **kwargs)
         self.config = config
+        self.run_mode = run_mode
 
         # --- Window chrome --------------------------------------------------
         self.overrideredirect(True)
@@ -211,27 +212,37 @@ class ControlPanel(tk.Toplevel):
             frame, text="Mode:", font=FONT_MAIN, fg=FG_TEXT, bg=BG_DARK
         ).pack(side=tk.LEFT)
 
-        for mode_value, label in [
-            ("offline", "Offline"),
-            ("online", "Online"),
-            ("combined", "Combined"),
-        ]:
-            rb = tk.Radiobutton(
+        if self.run_mode in ("online", "offline"):
+            lbl = tk.Label(
                 frame,
-                text=label,
-                variable=self._mode_var,
-                value=mode_value,
+                text=f"{self.run_mode.capitalize()} (Locked)",
                 font=FONT_MAIN,
-                fg=FG_TEXT,
+                fg=FG_GREEN if self.run_mode == "online" else FG_GOLD,
                 bg=BG_DARK,
-                selectcolor=BG_INPUT,
-                activebackground=BG_DARK,
-                activeforeground=FG_GREEN,
-                indicatoron=True,
-                command=self._handle_mode_change,
-                cursor="hand2",
             )
-            rb.pack(side=tk.LEFT, padx=6)
+            lbl.pack(side=tk.LEFT, padx=6)
+        else:
+            for mode_value, label in [
+                ("offline", "Offline"),
+                ("online", "Online"),
+                ("combined", "Combined"),
+            ]:
+                rb = tk.Radiobutton(
+                    frame,
+                    text=label,
+                    variable=self._mode_var,
+                    value=mode_value,
+                    font=FONT_MAIN,
+                    fg=FG_TEXT,
+                    bg=BG_DARK,
+                    selectcolor=BG_INPUT,
+                    activebackground=BG_DARK,
+                    activeforeground=FG_GREEN,
+                    indicatoron=True,
+                    command=self._handle_mode_change,
+                    cursor="hand2",
+                )
+                rb.pack(side=tk.LEFT, padx=6)
 
     def _build_persona_selector(self) -> None:
         frame = tk.Frame(self, bg=BG_DARK, padx=10, pady=4)
@@ -425,14 +436,17 @@ class ControlPanel(tk.Toplevel):
 
     def _toggle_online_options(self, mode: str) -> None:
         """Show or hide the online sub-options frame."""
-        if mode in ("online", "combined"):
+        if self.run_mode == "offline":
+            self._online_frame.pack_forget()
+            return
+        if mode in ("online", "combined") or self.run_mode == "online":
             self._online_frame.pack(fill=tk.X, after=self._region_label.master)
         else:
             self._online_frame.pack_forget()
 
     def _sync_from_config(self) -> None:
         """Pull current config values into the UI widgets."""
-        mode = self.config.get("mode", "offline")
+        mode = self.run_mode if self.run_mode in ("online", "offline") else self.config.get("mode", "offline")
         self._mode_var.set(mode)
         self._toggle_online_options(mode)
 
@@ -484,8 +498,9 @@ class ControlPanel(tk.Toplevel):
         self, mode: str, combined_active: Optional[str] = None
     ) -> None:
         """Programmatically update the mode indicator."""
-        self._mode_var.set(mode)
-        self._toggle_online_options(mode)
+        eff_mode = self.run_mode if self.run_mode in ("online", "offline") else mode
+        self._mode_var.set(eff_mode)
+        self._toggle_online_options(eff_mode)
 
     def update_region_display(self, w: int, h: int) -> None:
         """Update the region dimensions text."""

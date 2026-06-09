@@ -63,21 +63,22 @@ def _mask_key(key: str) -> str:
 class SettingsDialog(tk.Toplevel):
     """Settings dialog for FocusFlow."""
 
-    def __init__(
-        self,
-        parent: tk.Misc,
-        config: Any,
-        on_save: Optional[Any] = None,
-        on_opacity_preview: Optional[Any] = None,
-        **kwargs: Any,
-    ) -> None:
+    def __init__(self, parent: tk.Misc, config: Any, run_mode: str = "combined", on_save: Optional[Any] = None, on_opacity_preview: Optional[Any] = None, **kwargs: Any) -> None:
         super().__init__(parent, **kwargs)
         self.config = config
+        self.run_mode = run_mode
         self.on_save = on_save
         self.on_opacity_preview = on_opacity_preview
         self.title("FocusFlow Settings")
         self.configure(bg=BG_DARK)
-        self.geometry("500x640")
+
+        if self.run_mode == "online":
+            self.geometry("500x460")
+        elif self.run_mode == "offline":
+            self.geometry("500x400")
+        else:
+            self.geometry("500x640")
+
         self.resizable(False, True)
         self.attributes("-topmost", True)
 
@@ -127,6 +128,9 @@ class SettingsDialog(tk.Toplevel):
         )
         self._always_top_var = tk.BooleanVar(
             value=config.get("always_on_top", True)
+        )
+        self._auto_copy_var = tk.BooleanVar(
+            value=config.get("auto_copy_answer", False)
         )
         self._persona_var = tk.StringVar(
             value=config.get("ai_persona", "solver")
@@ -184,9 +188,12 @@ class SettingsDialog(tk.Toplevel):
         )
 
         # --- Sections -------------------------------------------------------
-        self._build_mode_section()
-        self._build_online_section()
-        self._build_offline_section()
+        if self.run_mode == "combined":
+            self._build_mode_section()
+        if self.run_mode != "offline":
+            self._build_online_section()
+        if self.run_mode != "online":
+            self._build_offline_section()
         self._build_capture_section()
         self._build_ocr_section()
         self._build_appearance_section()
@@ -614,6 +621,20 @@ class SettingsDialog(tk.Toplevel):
             cursor="hand2",
         ).pack(anchor="w")
 
+        # Auto-copy final answer option to clipboard
+        tk.Checkbutton(
+            lf,
+            text="Auto-copy final answer option to clipboard",
+            variable=self._auto_copy_var,
+            font=FONT_SMALL,
+            fg=FG_TEXT,
+            bg=BG_DARK,
+            selectcolor=BG_INPUT,
+            activebackground=BG_DARK,
+            activeforeground=FG_GREEN,
+            cursor="hand2",
+        ).pack(anchor="w")
+
     # --- Buttons -----------------------------------------------------------
 
     def _build_buttons(self) -> None:
@@ -701,13 +722,6 @@ class SettingsDialog(tk.Toplevel):
 
         try:
             updates = {
-                "mode": self._mode_var.get(),
-                "online_model": self._model_var.get(),
-                "online_send_mode": self._send_mode_var.get(),
-                "llm_model_path": self._model_path_var.get(),
-                "llm_threads": get_int_safe(self._threads_var, 4),
-                "llm_gpu_layers": get_int_safe(self._gpu_layers_var, 0),
-                "llm_context_length": get_int_safe(self._ctx_len_var, 2048),
                 "capture_mode": self._capture_mode_var.get(),
                 "region_x": get_int_safe(self._region_x_var, 0),
                 "region_y": get_int_safe(self._region_y_var, 0),
@@ -721,9 +735,31 @@ class SettingsDialog(tk.Toplevel):
                 "opacity": get_int_safe(self._opacity_var, 240),
                 "answer_mode": self._answer_mode_var.get(),
                 "always_on_top": self._always_top_var.get(),
-                "ai_persona": self._persona_map.get(self._persona_combo.get(), "solver"),
+                "auto_copy_answer": self._auto_copy_var.get(),
                 "capture_monitor_index": self._monitor_values[self._monitor_names.index(self._monitor_choice_var.get())] if self._monitor_choice_var.get() in self._monitor_names else 1,
             }
+
+            if self.run_mode == "combined":
+                updates["mode"] = self._mode_var.get()
+                updates["ai_persona"] = self._persona_map.get(self._persona_combo.get(), "solver")
+            elif self.run_mode == "online":
+                updates["mode"] = "online"
+            elif self.run_mode == "offline":
+                updates["mode"] = "offline"
+
+            if self.run_mode != "offline":
+                updates.update({
+                    "online_model": self._model_var.get(),
+                    "online_send_mode": self._send_mode_var.get(),
+                })
+
+            if self.run_mode != "online":
+                updates.update({
+                    "llm_model_path": self._model_path_var.get(),
+                    "llm_threads": get_int_safe(self._threads_var, 4),
+                    "llm_gpu_layers": get_int_safe(self._gpu_layers_var, 0),
+                    "llm_context_length": get_int_safe(self._ctx_len_var, 2048),
+                })
 
             # Additional validation on region dimensions and opacity bounds
             updates["region_w"] = max(10, updates["region_w"])

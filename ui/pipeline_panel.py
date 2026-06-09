@@ -9,6 +9,7 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import scrolledtext
 from typing import Optional
+from PIL import Image, ImageTk
 
 logger = logging.getLogger("focusflow.ui.pipeline_panel")
 
@@ -130,6 +131,20 @@ class PipelinePanel(tk.Frame):
         )
         self._llm_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
+        # Image Preview Thumbnail
+        self._preview_frame = tk.Frame(self, bg=BG_DARK, padx=12, pady=2)
+        self._preview_frame.pack(fill=tk.X)
+        self._preview_label = tk.Label(
+            self._preview_frame,
+            text="[No image captured]",
+            font=FONT_SMALL,
+            fg=FG_DIM,
+            bg=BG_PANEL,
+            relief=tk.FLAT,
+            height=6,
+        )
+        self._preview_label.pack(fill=tk.X)
+
         # ---- Separator -----------------------------------------------
         sep = tk.Frame(self, bg=ACCENT_PURPLE, height=1)
         sep.pack(fill=tk.X, padx=10, pady=4)
@@ -236,3 +251,35 @@ class PipelinePanel(tk.Frame):
         self._log_area.delete("1.0", tk.END)
         self._log_area.configure(state=tk.DISABLED)
         logger.debug("Pipeline log cleared")
+
+    def update_thumbnail(self, image: Optional[Image.Image]) -> None:
+        """Render a scaled thumbnail of the captured image."""
+        if image is None:
+            self._preview_label.configure(image="", text="[No image captured]")
+            self._preview_image = None
+            return
+            
+        try:
+            # Scale image to fit panel width (max width ~380, max height ~110)
+            w, h = image.size
+            max_w, max_h = 380, 110
+            ratio = min(max_w / w, max_h / h)
+            new_w = max(10, int(w * ratio))
+            new_h = max(10, int(h * ratio))
+            
+            try:
+                resampler = Image.Resampling.LANCZOS
+            except AttributeError:
+                try:
+                    resampler = Image.LANCZOS
+                except AttributeError:
+                    resampler = Image.ANTIALIAS
+                    
+            thumb = image.resize((new_w, new_h), resampler)
+            photo = ImageTk.PhotoImage(thumb)
+            
+            self._preview_label.configure(image=photo, text="")
+            self._preview_image = photo  # keep reference
+        except Exception as exc:
+            logger.error(f"Failed to update thumbnail: {exc}")
+            self._preview_label.configure(image="", text="[Preview Error]")

@@ -1,3 +1,23 @@
+# FocusFlow v1.2.0 — Triple Mode Partitioning (Online, Offline, Combined)
+
+This release partitions FocusFlow into three distinct run configurations, allowing complete isolation of execution profiles, custom adaptive layouts, and dedicated packaging.
+
+## 🚀 Key Features & Enhancements
+
+### ⚙️ 1. Engine Isolation (Online / Offline / Combined)
+* **Bootstrap Launchers**: Three dedicated launch points: `main_online.py` (locks application to Online-only solving), `main_offline.py` (locks application to local Offline-only solving), and `main.py` (Combined/Hybrid solving with user-toggle controls).
+* **Bypassed Lifecycles**: Booting Online-only completely bypasses `llama-server.exe` background startup and polling. Booting Offline-only skips all OpenAI API network checks and rotations.
+
+### 🎨 2. Adaptive Settings UI
+* **Dynamic Tab Hiding**: Hides irrelevant setting frames (e.g. online API fields in Offline mode, and GGUF parameters in Online mode) to keep configuration clean.
+* **Auto-Scaling Geometry**: The settings dialog automatically adjusts its window height depending on the active launcher (`500x460` for Online, `500x400` for Offline, and `500x640` for Combined).
+* **Config Safety**: Settings updates only apply changes relevant to the active run profile, preventing config overrides.
+
+### 📦 3. Dedicated Build Targets
+* **Spec Targets**: Setup PyInstaller specification profiles (`FocusFlow-Online.spec`, `FocusFlow-Offline.spec`, and `FocusFlow-Combined.spec`) to easily compile isolated binaries.
+
+---
+
 # FocusFlow v1.1.0 — Universal API Support & Stealth History HUD
 
 This release focuses on adding compatibility for third-party LLM providers, implementing a visual study history dashboard, and making the OCR capture and keyword retrieval pipelines more resilient.

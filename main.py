@@ -92,22 +92,36 @@ from ui.settings_dialog import SettingsDialog
 class FocusFlowApp:
     """Main application class that wires all components together."""
 
-    def __init__(self) -> None:
+    def __init__(self, run_mode: str = "combined") -> None:
         logger.info(f"[Startup] FocusFlow — log: {LOG_FILE}")
 
         # ── Core components ──────────────────────────────────────────
         self.config = ConfigManager(str(BASE_DIR))
+        self.run_mode = run_mode
+        if self.run_mode == "online":
+            self.config.set("mode", "online")
+        elif self.run_mode == "offline":
+            self.config.set("mode", "offline")
+
         self.kb = KnowledgeBase(str(BASE_DIR))
         self.history = HistoryManager(str(BASE_DIR), self.config)
         self.ocr = OCREngine(self.config)
         self.cleaner = OCRCleaner()
         self.capture = ScreenCapture(self.config)
-        self.ai = AIEngine(self.config, self.kb)
+        self.ai = AIEngine(self.config, self.kb, run_mode=self.run_mode)
         self.guard = CaptureGuard()
         self._solving = threading.Lock()
         self._ai_init_lock = threading.Lock()
         self._settings_dialog = None
         self._history_dialog = None
+        self._cleaned_up = False
+        self._last_ocr_text = ""
+        self._last_raw_text = ""
+        self._last_image = None
+        self._last_ocr_quality = "unknown"
+        self._last_ocr_warnings = []
+        self._last_screenshot_path = ""
+        self._chat_history = []
 
         # ── Tkinter root ─────────────────────────────────────────────
         self.root = tk.Tk()
@@ -181,7 +195,7 @@ class FocusFlowApp:
         self.pipeline.pack(fill=tk.BOTH, expand=True)
 
         # Control panel (center)
-        self.controls = ControlPanel(self.root, self.config)
+        self.controls = ControlPanel(self.root, self.config, run_mode=self.run_mode)
         self.controls.geometry(f"{panel_w}x{panel_h}+{10 + panel_w + 10}+50")
         self.controls.attributes("-alpha", opacity / 255.0)
 
@@ -205,9 +219,10 @@ class FocusFlowApp:
         self.controls.set_mode_callback(self._on_mode_change)
         self.controls.set_on_manual_send(self._on_manual_send_click)
 
-        self.answer.set_on_rerun(self._on_solve)
+        self.answer.set_on_rerun(self._on_rerun)
         self.answer.set_on_manual_q(self._on_manual_question)
         self.answer.set_on_clear(self._on_clear)
+        self.answer.set_on_chat_send(self._on_chat_send)
 
         # Track all windows for guard and toggle
         self._windows = [self.pipeline_win, self.controls, self.answer_win]
@@ -238,7 +253,7 @@ class FocusFlowApp:
             logger.warning("[AI] AI initialization already in progress")
             return
         try:
-            mode = self.config.get("mode") or "combined"
+            mode = self.run_mode if self.run_mode in ("online", "offline") else (self.config.get("mode") or "combined")
             if mode == "online":
                 self._update_llm_status("Online Mode Active", True)
                 self._log_safe("LLM: Online mode active.")
@@ -351,44 +366,83 @@ class FocusFlowApp:
         self.answer.set_system_message("[System] Capturing screen...")
 
         # Run in thread to avoid UI freeze
-        threading.Thread(target=self._solve_pipeline, daemon=True).start()
+        threading.Thread(target=self._solve_pipeline, args=(False,), daemon=True).start()
 
-    def _solve_pipeline(self) -> None:
+    def _on_rerun(self) -> None:
+        """Rerun the last capture's text and image through the AI solver."""
+        if not self._last_ocr_text:
+            self.pipeline.log("\n[Rerun] No previous capture available to rerun.")
+            self.answer.set_system_message("[System] No previous capture to rerun.")
+            return
+            
+        if not self._solving.acquire(blocking=False):
+            logger.warning("[Solve] Skip rerun — solver already busy")
+            return
+            
+        self.pipeline.log("\n--- Re-running last solve ---")
+        self.answer.set_system_message("[System] Re-running last solve...")
+        
+        # Run in thread to avoid UI freeze
+        threading.Thread(target=self._solve_pipeline, args=(True,), daemon=True).start()
+
+    def _solve_pipeline(self, rerun: bool = False) -> None:
         """Full solve pipeline (runs in background thread)."""
         try:
             t_start = time.perf_counter()
 
-            # 1. Capture
+            if rerun:
+                image = self._last_image
+                cleaned_text = self._last_ocr_text
+                ocr_duration = 0.0
+                raw_text = self._last_raw_text
+                quality = self._last_ocr_quality
+                warnings = self._last_ocr_warnings
+                screenshot_path = self._last_screenshot_path
+                self._log_safe(f"[Rerun] Using last capture data ({len(cleaned_text)} chars)")
+            else:
+                # 1. Capture
+                try:
+                    image = self.capture.capture()
+                    self._last_image = image
+                    self._log_safe(f"[Capture] {image.size[0]}x{image.size[1]} captured")
+                except Exception as e:
+                    self._log_safe(f"[Capture] Error: {e}")
+                    self._set_answer_safe(f"[Error] Screen capture failed: {e}")
+                    return
+
+                # 2. Save screenshot if enabled
+                screenshot_path = ""
+                if self.config.get("save_screenshot_history"):
+                    timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+                    screenshot_path = self.history.save_screenshot(image, timestamp)
+                self._last_screenshot_path = screenshot_path
+
+                # 3. OCR
+                t_ocr = time.perf_counter()
+                raw_text, ocr_err = self.ocr.extract_text(image)
+                self._last_raw_text = raw_text
+                ocr_duration = round(time.perf_counter() - t_ocr, 2)
+
+                if ocr_err:
+                    self._log_safe(f"[OCR] Warning: {ocr_err}")
+                self._log_safe(f"[OCR] Extracted {len(raw_text)} chars in {ocr_duration}s")
+
+                # 4. Clean OCR
+                cleaned_text, quality, warnings = self.cleaner.clean(raw_text)
+                self._last_ocr_text = cleaned_text
+                self._last_ocr_quality = quality
+                self._last_ocr_warnings = warnings
+                self._log_safe(
+                    f"[OCRCleaner] raw={len(raw_text)} chars -> cleaned={len(cleaned_text)} chars, quality={quality}"
+                )
+                for w in warnings:
+                    self._log_safe(f"[OCRCleaner] Warning: {w}")
+
+            # Update visual thumbnail
             try:
-                image = self.capture.capture()
-                self._log_safe(f"[Capture] {image.size[0]}x{image.size[1]} captured")
-            except Exception as e:
-                self._log_safe(f"[Capture] Error: {e}")
-                self._set_answer_safe(f"[Error] Screen capture failed: {e}")
-                return
-
-            # 2. Save screenshot if enabled
-            screenshot_path = ""
-            if self.config.get("save_screenshot_history"):
-                timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-                screenshot_path = self.history.save_screenshot(image, timestamp)
-
-            # 3. OCR
-            t_ocr = time.perf_counter()
-            raw_text, ocr_err = self.ocr.extract_text(image)
-            ocr_duration = round(time.perf_counter() - t_ocr, 2)
-
-            if ocr_err:
-                self._log_safe(f"[OCR] Warning: {ocr_err}")
-            self._log_safe(f"[OCR] Extracted {len(raw_text)} chars in {ocr_duration}s")
-
-            # 4. Clean OCR
-            cleaned_text, quality, warnings = self.cleaner.clean(raw_text)
-            self._log_safe(
-                f"[OCRCleaner] raw={len(raw_text)} chars -> cleaned={len(cleaned_text)} chars, quality={quality}"
-            )
-            for w in warnings:
-                self._log_safe(f"[OCRCleaner] Warning: {w}")
+                self.root.after(0, lambda: self.pipeline.update_thumbnail(image))
+            except Exception:
+                pass
 
             if not cleaned_text.strip():
                 self._set_answer_safe("[No text detected] Try adjusting the capture region.")
@@ -416,6 +470,19 @@ class FocusFlowApp:
             self._log_safe(f"[AI] Answer in {llm_duration}s via {engine} ({len(answer)} chars)")
             self._set_answer_safe(answer)
 
+            # Reset conversation chat history with the new capture solve
+            self._chat_history = [
+                {"role": "user", "content": cleaned_text},
+                {"role": "assistant", "content": answer}
+            ]
+
+            # Auto-copy final answer option to clipboard if enabled
+            if self.config.get("auto_copy_answer"):
+                try:
+                    self._auto_copy_answer_option(answer)
+                except Exception as e:
+                    logger.debug("Failed to auto-copy answer: %s", e)
+
             # 6. Save to history
             entry = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -440,6 +507,19 @@ class FocusFlowApp:
             self._set_answer_safe(f"[Error] Pipeline crashed: {e}")
         finally:
             self._solving.release()
+
+    def _auto_copy_answer_option(self, answer: str) -> None:
+        """Parse final answer option and copy to clipboard if possible."""
+        import re
+        m = re.search(r"Answer:\s*(.*)", answer, re.IGNORECASE)
+        if m:
+            val = m.group(1).strip()
+            if val:
+                # Remove surrounding markdown symbols like bold asterisks if present
+                val = val.replace("**", "").replace("`", "").strip()
+                self.root.clipboard_clear()
+                self.root.clipboard_append(val)
+                self._log_safe(f"[System] Auto-copied '{val}' to clipboard!")
 
     def _on_manual_question(self) -> None:
         """Handle Manual Q button on Answer Panel (shows dialog)."""
@@ -472,6 +552,12 @@ class FocusFlowApp:
                 duration = result.get("duration", 0)
                 self._log_safe(f"[AI] Manual answer in {duration}s via {engine}")
                 self._set_answer_safe(answer)
+
+                # Reset conversation chat history with the new manual solve
+                self._chat_history = [
+                    {"role": "user", "content": question.strip()},
+                    {"role": "assistant", "content": answer}
+                ]
 
                 # Save to history
                 entry = {
@@ -531,6 +617,7 @@ class FocusFlowApp:
             self._settings_dialog = SettingsDialog(
                 self.root,
                 self.config,
+                run_mode=self.run_mode,
                 on_save=self._on_settings_saved,
                 on_opacity_preview=self._set_opacity
             )
@@ -581,21 +668,26 @@ class FocusFlowApp:
         self.controls.update_region_display(w, h)
 
         # 4. Mode Display
-        mode = self.config.get("mode")
+        mode = self.run_mode if self.run_mode in ("online", "offline") else self.config.get("mode")
         combined = self.config.get("combined_active")
         self.controls.update_mode_display(mode, combined)
 
         # 5. Start offline engine if mode requires it
-        if mode in ("offline", "combined") and not self.ai.offline.is_ready():
+        if mode == "online":
+            self.ai.stop()
+        elif mode in ("offline", "combined") and not self.ai.offline.is_ready():
             threading.Thread(target=self._init_ai, daemon=True).start()
 
     def _on_clear(self) -> None:
         """Clear the answer panel."""
+        self._chat_history = []
         self.answer.clear_answer()
         self.answer.set_system_message("[System] Cleared.")
 
     def _on_mode_change(self, mode: str, combined_active: Optional[str] = None) -> None:
         """Handle mode change from UI."""
+        if self.run_mode in ("online", "offline"):
+            return
         self.config.set("mode", mode)
         if combined_active:
             self.config.set("combined_active", combined_active)
@@ -603,7 +695,9 @@ class FocusFlowApp:
         self.pipeline.log(f"[Mode] Changed to: {mode}" + (f" ({combined_active})" if combined_active else ""))
 
         # Start offline engine if needed and not already running
-        if mode in ("offline", "combined") and not self.ai.offline.is_ready():
+        if mode == "online":
+            self.ai.stop()
+        elif mode in ("offline", "combined") and not self.ai.offline.is_ready():
             threading.Thread(target=self._init_ai, daemon=True).start()
 
     def _on_toggle_panels(self) -> None:
@@ -641,6 +735,49 @@ class FocusFlowApp:
     def _on_clear_hotkey(self) -> None:
         """Safe wrapper for clear hotkey."""
         self.root.after(0, self._on_clear)
+
+    def _on_chat_send(self, text: str) -> None:
+        """Handle follow-up chat message sent from the Answer Panel."""
+        if not text or not text.strip():
+            return
+            
+        # If no active question is solved yet, don't allow chat follow-up
+        if not self._chat_history:
+            self.pipeline.log("\n[Chat] Cannot send follow-up. Solve a question first.")
+            self.answer.set_system_message("[System] Solve a question first.")
+            return
+
+        if not self._solving.acquire(blocking=False):
+            logger.warning("[Solve] Skip chat follow-up — solver already busy")
+            self.pipeline.log("[Chat] Skip follow-up — solver busy")
+            return
+            
+        self.pipeline.log(f"\n--- Chat Follow-up ---\n> {text[:80]}...")
+        self.answer.set_system_message("[System] Thinking...")
+        self.answer.append_chat_message(text, is_user=True)
+        
+        self._chat_history.append({"role": "user", "content": text})
+        
+        def _solve_chat_bg():
+            try:
+                result = self.ai.solve_chat(self._chat_history)
+                answer = result.get("answer", "[No answer]")
+                engine = result.get("engine", "unknown")
+                duration = result.get("duration", 0)
+                
+                self._log_safe(f"[AI] Chat answer in {duration}s via {engine}")
+                self._chat_history.append({"role": "assistant", "content": answer})
+                
+                # Append to Answer Panel UI
+                self.root.after(0, lambda: self.answer.append_chat_message(answer, is_user=False))
+                self._set_system_safe("[System] Ready.")
+            except Exception as e:
+                logger.error(f"[Chat] Socratic solve crashed: {e}")
+                self._set_system_safe(f"[Error] Chat query failed: {e}")
+            finally:
+                self._solving.release()
+                
+        threading.Thread(target=_solve_chat_bg, daemon=True).start()
 
     def _on_settings_hotkey(self) -> None:
         """Safe wrapper for settings hotkey."""
@@ -714,6 +851,9 @@ class FocusFlowApp:
 
     def cleanup(self) -> None:
         """Clean up resources on exit."""
+        if getattr(self, "_cleaned_up", False):
+            return
+        self._cleaned_up = True
         logger.info("[Shutdown] Cleaning up...")
         self.guard.stop()
         self.ai.stop()

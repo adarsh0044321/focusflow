@@ -46,6 +46,7 @@ class AnswerPanel(tk.Frame):
         self._on_rerun: Optional[Callable[[], None]] = None
         self._on_manual_q: Optional[Callable[[], None]] = None
         self._on_clear: Optional[Callable[[], None]] = None
+        self._on_chat_send: Optional[Callable[[str], None]] = None
 
         self._build_ui()
         logger.debug("AnswerPanel initialized")
@@ -202,6 +203,46 @@ class AnswerPanel(tk.Frame):
         )
         footer.pack(fill=tk.X, side=tk.BOTTOM)
 
+        # ---- Chat Follow-up entry -------------------------------------
+        self._chat_frame = tk.Frame(self, bg=BG_DARK, padx=10, pady=4)
+        self._chat_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        
+        tk.Label(
+            self._chat_frame, text="💬 Chat Follow-up:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
+        ).pack(fill=tk.X, anchor="w", pady=(0, 2))
+        
+        entry_row = tk.Frame(self._chat_frame, bg=BG_DARK)
+        entry_row.pack(fill=tk.X)
+        
+        self._chat_entry = tk.Entry(
+            entry_row,
+            font=FONT_MAIN,
+            fg=FG_TEXT,
+            bg=BG_INPUT,
+            insertbackground=FG_GREEN,
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=FG_DIM,
+            highlightcolor=FG_GREEN,
+        )
+        self._chat_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=3)
+        self._chat_entry.bind("<Return>", lambda _e: self._handle_chat_send())
+        
+        self._btn_chat_send = tk.Button(
+            entry_row,
+            text="Send",
+            font=FONT_SMALL,
+            fg=BG_DARK,
+            bg=FG_GREEN,
+            activebackground=FG_GREEN,
+            activeforeground=BG_DARK,
+            relief=tk.FLAT,
+            padx=10,
+            cursor="hand2",
+            command=self._handle_chat_send,
+        )
+        self._btn_chat_send.pack(side=tk.LEFT, padx=(6, 0))
+
     def _on_drag_start(self, event: tk.Event) -> None:
         self._drag_data["x"] = event.x
         self._drag_data["y"] = event.y
@@ -329,3 +370,41 @@ class AnswerPanel(tk.Frame):
             logger.debug("Manual question entered (%d chars)", len(question))
             return question.strip()
         return None
+
+    def _handle_chat_send(self) -> None:
+        text = self._chat_entry.get().strip()
+        if not text:
+            return
+        self._chat_entry.delete(0, tk.END)
+        if self._on_chat_send:
+            try:
+                self._on_chat_send(text)
+            except Exception as exc:
+                logger.error("Chat send callback error: %s", exc)
+
+    def set_on_chat_send(self, callback: Callable[[str], None]) -> None:
+        """Register a callback for the follow-up chat Send action."""
+        self._on_chat_send = callback
+
+    def append_chat_message(self, text: str, is_user: bool = False) -> None:
+        """Append a follow-up chat message to the answer area."""
+        self._answer_area.configure(state=tk.NORMAL)
+        
+        # Add a visual separator if this is the start of follow-up chat
+        content = self._answer_area.get("1.0", tk.END).strip()
+        if content and "💬 Follow-up Chat" not in content:
+            self._answer_area.insert(tk.END, "\n\n" + "─" * 40 + "\n💬 Follow-up Chat\n")
+            
+        if is_user:
+            self._answer_area.insert(tk.END, f"\n> User: {text}\n", "highlight")
+        else:
+            self._answer_area.insert(tk.END, f"\nFocusFlow:\n", "highlight")
+            for line in text.splitlines(keepends=True):
+                stripped = line.lstrip()
+                if stripped.lower().startswith("answer:"):
+                    self._answer_area.insert(tk.END, line, "highlight")
+                else:
+                    self._answer_area.insert(tk.END, line, "answer")
+                    
+        self._answer_area.configure(state=tk.DISABLED)
+        self._answer_area.see(tk.END)

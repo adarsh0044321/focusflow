@@ -62,9 +62,10 @@ _CONCISE_SUFFIX = "\n\nBe brief. Give only the answer with minimal explanation."
 class AIEngine:
     """Unified AI interface that routes to offline or online engines."""
 
-    def __init__(self, config, knowledge_base=None) -> None:
+    def __init__(self, config, knowledge_base=None, run_mode: str = "combined") -> None:
         self.config = config
         self.kb = knowledge_base
+        self.run_mode = run_mode
         self.offline = OfflineEngine(config)
         self.online = OnlineEngine(config)
         self.logger = logger
@@ -75,6 +76,9 @@ class AIEngine:
 
     def start(self) -> None:
         """Start the offline engine if the current mode requires it."""
+        if self.run_mode == "online":
+            self.logger.info("[AIEngine] Online-only mode active: offline engine start bypassed")
+            return
         mode = self.config.get("mode") or "combined"
         if mode in ("offline", "combined"):
             self.logger.info("[AIEngine] Starting offline engine")
@@ -82,6 +86,8 @@ class AIEngine:
 
     def stop(self) -> None:
         """Stop the offline engine process."""
+        if self.run_mode == "online":
+            return
         self.logger.info("[AIEngine] Stopping offline engine")
         self.offline.stop()
 
@@ -130,6 +136,9 @@ class AIEngine:
         - ``online``   → always online
         - ``hybrid``   → prefer offline if ready, else online fallback
         """
+        if self.run_mode in ("online", "offline"):
+            return self.run_mode
+
         mode = self.config.get("mode") or "combined"
         if mode == "combined":
             # In combined mode, check which sub-mode is active
@@ -160,6 +169,8 @@ class AIEngine:
         """
         t0 = time.perf_counter()
         config_mode = self.config.get("mode") or "combined"
+        if self.run_mode in ("online", "offline"):
+            config_mode = self.run_mode
         system_prompt = self._build_system_prompt()
         knowledge_ctx = self._get_knowledge_context(ocr_text)
         mode = self._effective_mode()
@@ -240,6 +251,8 @@ class AIEngine:
         """
         t0 = time.perf_counter()
         config_mode = self.config.get("mode") or "combined"
+        if self.run_mode in ("online", "offline"):
+            config_mode = self.run_mode
         knowledge_ctx = self._get_knowledge_context(question_text)
         mode = self._effective_mode()
 
@@ -303,6 +316,40 @@ class AIEngine:
                 self.logger.error(f"[AIEngine] Manual solve error: {exc}")
                 answer = f"[Error] {exc}"
                 engine = mode
+
+        duration = round(time.perf_counter() - t0, 2)
+        return {
+            "answer": answer,
+            "duration": duration,
+            "mode": mode,
+            "engine": engine,
+        }
+
+    def solve_chat(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        """Process a multi-turn chat interaction."""
+        t0 = time.perf_counter()
+        system_prompt = self._build_system_prompt()
+        mode = self._effective_mode()
+
+        answer: str
+        engine: str
+
+        try:
+            if mode == "online":
+                answer = self.online.query_chat(messages, system_prompt)
+                engine = f"online/{self.config.get('online_model', 'gpt-4o')}"
+            else:
+                if not self.offline.is_ready():
+                    status = self.offline.status_message()
+                    answer = f"[Offline engine not ready] {status}"
+                    engine = "offline"
+                else:
+                    answer = self.offline.query_chat(messages, system_prompt)
+                    engine = "offline/llamacpp"
+        except Exception as exc:
+            self.logger.error(f"[AIEngine] Chat solve error: {exc}")
+            answer = f"[Error] {exc}"
+            engine = mode
 
         duration = round(time.perf_counter() - t0, 2)
         return {

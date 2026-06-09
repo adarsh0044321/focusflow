@@ -124,10 +124,19 @@ No Python installation or dependency setup is required.
    ```
 
 2. **Run Application**:
-   Start the application entry point:
-   ```powershell
-   python main.py
-   ```
+   Start the application using one of the three target bootstrap launchers:
+   - **Combined (Hybrid) version**:
+     ```powershell
+     python main.py
+     ```
+   - **Online-Only version**:
+     ```powershell
+     python main_online.py
+     ```
+   - **Offline-Only version**:
+     ```powershell
+     python main_offline.py
+     ```
 
 ---
 
@@ -159,10 +168,19 @@ FocusFlow runs persistently in the background. Use the following global shortcut
 The repository is fully optimized for production packaging and git deployment:
 1. **Repository Hygiene**: The `.gitignore` is pre-configured to exclude large external binaries (`Tesseract-OCR`, `llama.cpp-master`, `svchost.exe`), model weights (`models/`), local database configurations (`data/settings.json`), logs, and screenshots.
 2. **Prerequisites for Release Build**:
-    To bundle FocusFlow into a standalone executable (without requiring Python to be installed on target machines):
-    ```powershell
-    python -m PyInstaller FocusFlow.spec --noconfirm
-    ```
+    To bundle FocusFlow into a standalone executable (without requiring Python to be installed on target machines), run the PyInstaller command for your target run mode profile:
+    - **Online Only**:
+      ```powershell
+      python -m PyInstaller FocusFlow-Online.spec --noconfirm
+      ```
+    - **Offline Only**:
+      ```powershell
+      python -m PyInstaller FocusFlow-Offline.spec --noconfirm
+      ```
+    - **Combined (Hybrid)**:
+      ```powershell
+      python -m PyInstaller FocusFlow-Combined.spec --noconfirm
+      ```
 
 ---
 

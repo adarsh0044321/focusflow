@@ -349,3 +349,53 @@ class OfflineEngine:
         except (KeyError, ValueError) as exc:
             self.logger.error(f"[LLM] Bad response format: {exc}")
             return "[Error] Invalid response from model."
+
+    def _format_phi3_chat(self, messages: list[dict[str, str]], system_prompt: str = "") -> str:
+        """Format a list of message dicts into the Phi-3 chat template format."""
+        parts: list[str] = []
+        sys_text = system_prompt.strip()
+        if sys_text:
+            parts.append(f"<|system|>\n{sys_text}\n<|end|>")
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            parts.append(f"<|{role}|>\n{content.strip()}\n<|end|>")
+        parts.append("<|assistant|>\n")
+        return "\n".join(parts)
+
+    def query_chat(self, messages: list[dict[str, str]], system_prompt: str = "") -> str:
+        """Send a multi-turn chat sequence to llama.cpp and return the assistant response."""
+        if not self._ready_event.is_set():
+            raise RuntimeError("Offline engine is not ready")
+
+        port = int(self.config.get("llm_port"))
+        url = f"http://127.0.0.1:{port}/completion"
+
+        formatted = self._format_phi3_chat(messages, system_prompt)
+
+        payload = {
+            "prompt": formatted,
+            "n_predict": int(self.config.get("llm_max_tokens", 600)),
+            "temperature": float(self.config.get("llm_temperature", 0.1)),
+            "top_p": float(self.config.get("llm_top_p", 0.9)),
+        }
+
+        timeout = int(self.config.get("llm_timeout", 300))
+
+        try:
+            resp = requests.post(url, json=payload, timeout=timeout)
+            resp.raise_for_status()
+            data = resp.json()
+            content: str = data.get("content", "").strip()
+            if not content:
+                self.logger.warning("[LLM] Empty chat response from llama.cpp")
+            return content
+        except requests.Timeout:
+            self.logger.error("[LLM] llama.cpp chat query timed out")
+            return "[Error] The model took too long to respond."
+        except requests.RequestException as exc:
+            self.logger.error(f"[LLM] llama.cpp chat query failed: {exc}")
+            return f"[Error] Query failed: {exc}"
+        except (KeyError, ValueError) as exc:
+            self.logger.error(f"[LLM] Bad chat response format: {exc}")
+            return "[Error] Invalid response from model."

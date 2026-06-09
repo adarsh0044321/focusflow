@@ -348,3 +348,72 @@ class OnlineEngine:
 
         self.logger.error(f"[API] All {self._MAX_RETRIES} vision retries exhausted. Last: {last_error}")
         return f"[Error] All API keys exhausted after {self._MAX_RETRIES} vision retries. (Last: {last_error})"
+
+    def query_chat(self, messages: list[dict[str, str]], system_prompt: str = "") -> str:
+        """Send a chat completion list with a system prompt and rotate keys on failure."""
+        model: str = self.config.get("online_model", "gpt-4o")
+        max_tokens: int = int(self.config.get("online_max_tokens", 1000))
+        temperature: float = float(self.config.get("online_temperature", 0.2))
+
+        chat_messages = []
+        if system_prompt.strip():
+            chat_messages.append({"role": "system", "content": system_prompt.strip()})
+        chat_messages.extend(messages)
+
+        last_error = None
+        for attempt in range(self._MAX_RETRIES):
+            try:
+                client, key = self._get_client()
+                self.logger.debug(
+                    f"[API] Chat query attempt {attempt + 1} with key ...{key[-4:] if len(key) > 4 else '***'}"
+                )
+
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=chat_messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+                if response and response.choices and response.choices[0].message.content:
+                    return response.choices[0].message.content.strip()
+                self.logger.warning("[API] Empty chat response from API")
+                return ""
+
+            except APIStatusError as exc:
+                last_error = exc
+                if exc.status_code in (400, 404) and model != "gpt-4o-mini":
+                    self.logger.warning(
+                        f"[API] Model {model} failed with {exc.status_code}. Falling back to gpt-4o-mini."
+                    )
+                    model = "gpt-4o-mini"
+                    continue
+
+                if self._is_retryable(exc):
+                    self.logger.warning(
+                        f"[API] Retryable API status error on chat attempt {attempt + 1}: {exc}"
+                    )
+                    self._rotate_key()
+                    time.sleep(min(2 ** attempt, 8))
+                    continue
+                self.logger.error(f"[API] Non-retryable API chat error: {exc}")
+                return f"[Error] API error: {exc}"
+
+            except (RateLimitError, APIConnectionError) as exc:
+                last_error = exc
+                self.logger.warning(
+                    f"[API] Retryable connection/rate limit error on chat attempt {attempt + 1}: {exc}"
+                )
+                self._rotate_key()
+                time.sleep(min(2 ** attempt, 8))
+                continue
+
+            except ValueError as exc:
+                self.logger.error(f"[API] {exc}")
+                return f"[Error] {exc}"
+
+            except Exception as exc:
+                self.logger.error(f"[API] Unexpected chat error: {exc}")
+                return f"[Error] {exc}"
+
+        self.logger.error(f"[API] All {self._MAX_RETRIES} chat retries exhausted. Last: {last_error}")
+        return f"[Error] All API keys exhausted after {self._MAX_RETRIES} chat retries. (Last: {last_error})"

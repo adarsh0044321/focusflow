@@ -137,6 +137,33 @@ class TestFocusFlowFixes(unittest.TestCase):
         self.assertIn("1. Solve the problem methodically", system_prompt)
         self.assertIn("2. If options are provided", system_prompt)
 
+    def test_knowledge_base_substring_matching_bug(self):
+        """Verify that KnowledgeBase search uses whole-word set intersection and does not match substrings."""
+        from knowledge_base import KnowledgeBase
+        kb = KnowledgeBase(".")
+        
+        # Searching for 'try' should return empty since it's only a substring of geometry/chemistry/trigonometry
+        context = kb.get_context("try")
+        self.assertEqual(context, "")
+        
+        # Searching for a real standalone word should return matching context
+        context_real = kb.get_context("bohr")
+        self.assertIn("Atomic Structure", context_real)
+
+    def test_mode_change_resource_leak_fix(self):
+        """Verify that changing mode to online stops the offline engine process."""
+        # Mock FocusFlowApp structures
+        app_mock = MagicMock()
+        app_mock.config = self.config
+        app_mock.ai = MagicMock()
+        
+        # Call _on_mode_change to transition to online
+        from main import FocusFlowApp
+        FocusFlowApp._on_mode_change(app_mock, "online")
+        
+        # Ensure ai.stop() was called to terminate llama-server
+        app_mock.ai.stop.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

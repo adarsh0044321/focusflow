@@ -94,10 +94,13 @@ class KnowledgeBase:
         if not words:
             return ""
 
+        normalized_words = {self._normalize_word(w) for w in words}
+
         scored: list[tuple[str, int]] = []
         for topic, text in self._topics.items():
-            text_lower = text.lower()
-            score = sum(1 for w in words if w in text_lower)
+            topic_raw = set(re.findall(r"[a-zA-Z0-9]{2,}", text.lower()))
+            topic_words = {self._normalize_word(w) for w in topic_raw}
+            score = len(normalized_words.intersection(topic_words))
             if score > 0:
                 scored.append((topic, score))
 
@@ -116,6 +119,24 @@ class KnowledgeBase:
             logger.debug("KB match  topic=%s  score=%d", topic, score)
 
         return "\n\n".join(parts)
+
+    @staticmethod
+    def _normalize_word(w: str) -> str:
+        w = w.lower()
+        if len(w) > 4:
+            if w.endswith("ies"):
+                return w[:-3] + "y"
+            if w.endswith("ves"):
+                return w[:-1]
+            if w.endswith("es") and not w.endswith("ss"):
+                return w[:-2]
+            if w.endswith("s") and not w.endswith("ss"):
+                return w[:-1]
+            if w.endswith("ing"):
+                return w[:-3]
+            if w.endswith("ed"):
+                return w[:-2]
+        return w
 
     def reload(self) -> None:
         """Re-scan ``knowledge_base/`` and reload all topic files."""

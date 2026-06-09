@@ -64,6 +64,7 @@ DEFAULTS: dict[str, Any] = {
     "online_temperature": 0.2,
     # Answer
     "answer_mode": "concise",           # "concise" or "detailed"
+    "auto_copy_answer": False,
     # UI
     "first_run": True,
     "opacity": 240,
