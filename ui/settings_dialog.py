@@ -63,19 +63,20 @@ def _mask_key(key: str) -> str:
 class SettingsDialog(tk.Toplevel):
     """Settings dialog for FocusFlow."""
 
-    def __init__(self, parent: tk.Misc, config: Any, run_mode: str = "combined", on_save: Optional[Any] = None, on_opacity_preview: Optional[Any] = None, **kwargs: Any) -> None:
+    def __init__(self, parent: tk.Misc, config: Any, run_mode: str = "combined", on_save: Optional[Any] = None, on_opacity_preview: Optional[Any] = None, on_quit: Optional[Any] = None, **kwargs: Any) -> None:
         super().__init__(parent, **kwargs)
         self.config = config
         self.run_mode = run_mode
         self.on_save = on_save
         self.on_opacity_preview = on_opacity_preview
+        self.on_quit = on_quit
         self.title("FocusFlow Settings")
         self.configure(bg=BG_DARK)
 
         if self.run_mode == "online":
-            self.geometry("500x460")
+            self.geometry("500x520")
         elif self.run_mode == "offline":
-            self.geometry("500x400")
+            self.geometry("500x460")
         else:
             self.geometry("500x640")
 
@@ -131,6 +132,9 @@ class SettingsDialog(tk.Toplevel):
         )
         self._auto_copy_var = tk.BooleanVar(
             value=config.get("auto_copy_answer", False)
+        )
+        self._clipboard_monitor_var = tk.BooleanVar(
+            value=config.get("clipboard_monitor_enabled", False)
         )
         self._persona_var = tk.StringVar(
             value=config.get("ai_persona", "solver")
@@ -190,6 +194,7 @@ class SettingsDialog(tk.Toplevel):
         # --- Sections -------------------------------------------------------
         if self.run_mode == "combined":
             self._build_mode_section()
+        self._build_persona_section()
         if self.run_mode != "offline":
             self._build_online_section()
         if self.run_mode != "online":
@@ -232,11 +237,14 @@ class SettingsDialog(tk.Toplevel):
                 cursor="hand2",
             ).pack(side=tk.LEFT, padx=8)
 
-        # Add Persona Selector inside Mode section
-        persona_row = tk.Frame(lf, bg=BG_DARK)
-        persona_row.pack(fill=tk.X, pady=(6, 0))
+    def _build_persona_section(self) -> None:
+        lf = _themed_labelframe(self._body, "AI Persona")
+        lf.pack(fill=tk.X, padx=10, pady=4)
+
+        row = tk.Frame(lf, bg=BG_DARK)
+        row.pack(fill=tk.X)
         tk.Label(
-            persona_row, text="Persona:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
+            row, text="Persona:", font=FONT_SMALL, fg=FG_TEXT, bg=BG_DARK
         ).pack(side=tk.LEFT)
 
         self._persona_map = {
@@ -249,7 +257,7 @@ class SettingsDialog(tk.Toplevel):
 
         display_val = self._reverse_persona_map.get(self._persona_var.get(), "General Solver")
         self._persona_combo = ttk.Combobox(
-            persona_row,
+            row,
             values=list(self._persona_map.keys()),
             state="readonly",
             font=FONT_SMALL,
@@ -634,6 +642,20 @@ class SettingsDialog(tk.Toplevel):
             activeforeground=FG_GREEN,
             cursor="hand2",
         ).pack(anchor="w")
+ 
+        # Clipboard monitor checkbutton
+        tk.Checkbutton(
+            lf,
+            text="Clipboard Monitor (Auto-solve Ctrl+C)",
+            variable=self._clipboard_monitor_var,
+            font=FONT_SMALL,
+            fg=FG_TEXT,
+            bg=BG_DARK,
+            selectcolor=BG_INPUT,
+            activebackground=BG_DARK,
+            activeforeground=FG_GREEN,
+            cursor="hand2",
+        ).pack(anchor="w")
 
     # --- Buttons -----------------------------------------------------------
 
@@ -670,6 +692,21 @@ class SettingsDialog(tk.Toplevel):
             cursor="hand2",
             command=self.destroy,
         ).pack(side=tk.LEFT)
+
+        tk.Button(
+            btn_frame,
+            text="Quit App",
+            font=FONT_MAIN,
+            fg=FG_TEXT,
+            bg=FG_RED,
+            activebackground=FG_RED,
+            activeforeground=FG_TEXT,
+            relief=tk.FLAT,
+            padx=16,
+            pady=4,
+            cursor="hand2",
+            command=self._on_quit_click,
+        ).pack(side=tk.RIGHT)
 
     # ======================================================================
     # Internal helpers
@@ -736,12 +773,13 @@ class SettingsDialog(tk.Toplevel):
                 "answer_mode": self._answer_mode_var.get(),
                 "always_on_top": self._always_top_var.get(),
                 "auto_copy_answer": self._auto_copy_var.get(),
+                "clipboard_monitor_enabled": self._clipboard_monitor_var.get(),
                 "capture_monitor_index": self._monitor_values[self._monitor_names.index(self._monitor_choice_var.get())] if self._monitor_choice_var.get() in self._monitor_names else 1,
             }
 
+            updates["ai_persona"] = self._persona_map.get(self._persona_combo.get(), "solver")
             if self.run_mode == "combined":
                 updates["mode"] = self._mode_var.get()
-                updates["ai_persona"] = self._persona_map.get(self._persona_combo.get(), "solver")
             elif self.run_mode == "online":
                 updates["mode"] = "online"
             elif self.run_mode == "offline":
@@ -782,3 +820,12 @@ class SettingsDialog(tk.Toplevel):
     def destroy(self) -> None:
         """Clean up bindings and destroy the window."""
         super().destroy()
+
+    def _on_quit_click(self) -> None:
+        """Handle Quit App button click."""
+        if self.on_quit is not None:
+            try:
+                self.on_quit()
+            except Exception as exc:
+                logger.error("Error executing on_quit callback: %s", exc)
+        self.destroy()

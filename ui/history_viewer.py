@@ -7,7 +7,7 @@ detailed OCR/AI metrics, text search filters, and screenshot overlays.
 import logging
 import os
 import tkinter as tk
-from tkinter import scrolledtext, ttk
+from tkinter import scrolledtext, ttk, filedialog, messagebox
 from typing import Any, Optional
 from PIL import Image, ImageTk
 
@@ -159,6 +159,21 @@ class HistoryViewerDialog(tk.Toplevel):
             command=self._show_screenshot_popup,
         )
         self._btn_screenshot.pack(side=tk.LEFT)
+
+        self._btn_export = tk.Button(
+            self._actions_frame,
+            text="📤 Export Study Guide",
+            font=FONT_SMALL,
+            fg=BG_DARK,
+            bg=FG_GOLD,
+            activebackground=FG_GOLD,
+            activeforeground=BG_DARK,
+            relief=tk.FLAT,
+            padx=10,
+            cursor="hand2",
+            command=self._export_study_guide,
+        )
+        self._btn_export.pack(side=tk.LEFT, padx=(6, 0))
 
         # Tabs or split-text area for OCR text and Answer
         text_pane = tk.PanedWindow(self._right_frame, orient=tk.VERTICAL, bg=BG_DARK, bd=0, sashwidth=4, sashrelief=tk.FLAT)
@@ -328,3 +343,56 @@ class HistoryViewerDialog(tk.Toplevel):
             popup.focus_force()
         except Exception as exc:
             logger.error("Failed to open screenshot popup: %s", exc)
+
+    def _export_study_guide(self) -> None:
+        """Export the currently filtered entries into a structured Markdown revision guide."""
+        if not self._filtered_entries:
+            messagebox.showinfo("Export Study Guide", "No entries available to export.", parent=self)
+            return
+
+        filename = filedialog.asksaveasfilename(
+            parent=self,
+            title="Export Revision & Study Guide",
+            initialfile="FocusFlow_Study_Guide.md",
+            filetypes=[("Markdown files", "*.md"), ("All files", "*.*")],
+            defaultextension=".md"
+        )
+        if not filename:
+            return
+
+        try:
+            from datetime import datetime
+            timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            md_content = []
+            md_content.append("# FocusFlow Revision & Study Guide 🪐")
+            md_content.append(f"*Generated on {timestamp_str}*")
+            md_content.append(f"\nTotal Solved Questions: {len(self._filtered_entries)}")
+            md_content.append("\n" + "=" * 60 + "\n")
+
+            for idx, entry in enumerate(self._filtered_entries, 1):
+                ts = entry.get("timestamp", "N/A")
+                mode = entry.get("mode", "offline").upper()
+                engine = entry.get("engine", "unknown")
+                quality = entry.get("ocr_quality", "unknown").upper()
+                raw_ocr = entry.get("raw_ocr", "").strip()
+                answer = entry.get("answer", "").strip()
+
+                md_content.append(f"## Question {idx} ({ts})")
+                md_content.append(f"**AI Engine Mode:** {mode} ({engine})  |  **OCR Quality:** {quality}")
+                md_content.append("\n### Captured Question:")
+                # Format blockquote for question text
+                quoted_ocr = "\n".join(f"> {line}" for line in raw_ocr.splitlines())
+                md_content.append(quoted_ocr)
+                md_content.append("\n### AI Step-by-Step Solution:")
+                md_content.append(answer)
+                md_content.append("\n" + "—" * 40 + "\n")
+
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("\n".join(md_content))
+                
+            messagebox.showinfo("Export Successful", f"Successfully exported {len(self._filtered_entries)} entries to:\n{filename}", parent=self)
+            logger.info("Exported %d entries to %s", len(self._filtered_entries), filename)
+        except Exception as exc:
+            logger.error("Failed to export study guide: %s", exc)
+            messagebox.showerror("Export Failed", f"An error occurred while exporting:\n{exc}", parent=self)

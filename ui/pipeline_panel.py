@@ -8,7 +8,7 @@ import logging
 import tkinter as tk
 from datetime import datetime
 from tkinter import scrolledtext
-from typing import Optional
+from typing import Callable, Optional
 from PIL import Image, ImageTk
 
 logger = logging.getLogger("focusflow.ui.pipeline_panel")
@@ -46,6 +46,7 @@ class PipelinePanel(tk.Frame):
 
     def __init__(self, parent: tk.Misc, **kwargs) -> None:
         super().__init__(parent, bg=BG_DARK, **kwargs)
+        self._on_thumbnail_click: Optional[Callable[[], None]] = None
         self._build_ui()
         # Write the startup message into the log
         self.log(_STARTUP_MESSAGE)
@@ -283,3 +284,16 @@ class PipelinePanel(tk.Frame):
         except Exception as exc:
             logger.error(f"Failed to update thumbnail: {exc}")
             self._preview_label.configure(image="", text="[Preview Error]")
+
+    def set_on_thumbnail_click(self, callback: Callable[[], None]) -> None:
+        """Register a callback for the thumbnail click."""
+        self._on_thumbnail_click = callback
+        self._preview_label.configure(cursor="hand2")
+        self._preview_label.bind("<Button-1>", lambda _e: self._handle_thumbnail_click())
+
+    def _handle_thumbnail_click(self) -> None:
+        if self._on_thumbnail_click:
+            try:
+                self._on_thumbnail_click()
+            except Exception as exc:
+                logger.error(f"Error in thumbnail click callback: {exc}")

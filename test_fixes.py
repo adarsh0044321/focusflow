@@ -164,6 +164,32 @@ class TestFocusFlowFixes(unittest.TestCase):
         # Ensure ai.stop() was called to terminate llama-server
         app_mock.ai.stop.assert_called_once()
 
+    def test_settings_dialog_persona_in_all_modes(self):
+        """Verify settings dialog exposes and updates persona selector in all run modes."""
+        from ui.settings_dialog import SettingsDialog
+        
+        # Mock Tk parent
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        
+        try:
+            # Test Online mode
+            config_mock = MagicMock()
+            config_mock.get.side_effect = lambda key, default=None: "solver" if key == "ai_persona" else default
+            dialog_online = SettingsDialog(root, config_mock, run_mode="online")
+            self.assertTrue(hasattr(dialog_online, "_persona_combo"))
+            self.assertEqual(dialog_online._persona_combo.get(), "General Solver")
+            dialog_online.destroy()
+            
+            # Test Offline mode
+            dialog_offline = SettingsDialog(root, config_mock, run_mode="offline")
+            self.assertTrue(hasattr(dialog_offline, "_persona_combo"))
+            self.assertEqual(dialog_offline._persona_combo.get(), "General Solver")
+            dialog_offline.destroy()
+        finally:
+            root.destroy()
+
 
 if __name__ == "__main__":
     unittest.main()

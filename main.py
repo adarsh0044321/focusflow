@@ -114,6 +114,7 @@ class FocusFlowApp:
         self._ai_init_lock = threading.Lock()
         self._settings_dialog = None
         self._history_dialog = None
+        self._preview_win = None
         self._cleaned_up = False
         self._last_ocr_text = ""
         self._last_raw_text = ""
@@ -122,6 +123,8 @@ class FocusFlowApp:
         self._last_ocr_warnings = []
         self._last_screenshot_path = ""
         self._chat_history = []
+        self._last_clipboard_text = ""
+        self._last_ai_answer = ""
 
         # ── Tkinter root ─────────────────────────────────────────────
         self.root = tk.Tk()
@@ -167,7 +170,15 @@ class FocusFlowApp:
         # ── Mark first run complete ──────────────────────────────────
         if self.config.get("first_run"):
             self.config.set("first_run", False)
-
+ 
+        # ── Clipboard Monitor ────────────────────────────────────────
+        self._last_clipboard_text = ""
+        try:
+            self._last_clipboard_text = self.root.clipboard_get().strip()
+        except Exception:
+            pass
+        self.check_clipboard()
+ 
         logger.info("[Startup] UI initialised — entering main loop")
 
     # ==================================================================
@@ -216,8 +227,11 @@ class FocusFlowApp:
         self.controls.set_on_region(self._on_region_select)
         self.controls.set_on_settings(self._on_settings)
         self.controls.set_on_history(self._on_history)
+        self.controls.set_on_close(self._hide_panels)
+        self.controls.set_on_quit(self.root.destroy)
         self.controls.set_mode_callback(self._on_mode_change)
         self.controls.set_on_manual_send(self._on_manual_send_click)
+        self.pipeline.set_on_thumbnail_click(self._on_thumbnail_click)
 
         self.answer.set_on_rerun(self._on_rerun)
         self.answer.set_on_manual_q(self._on_manual_question)
@@ -353,6 +367,52 @@ class FocusFlowApp:
     # Actions
     # ==================================================================
 
+    def _on_thumbnail_click(self) -> None:
+        """Open a protected full-size window showing the last captured image."""
+        if not hasattr(self, "_last_image") or self._last_image is None:
+            logger.info("No captured image to preview")
+            return
+
+        from PIL import ImageTk
+        if hasattr(self, "_preview_win") and self._preview_win is not None:
+            try:
+                self._preview_win.destroy()
+            except Exception:
+                pass
+
+        self._preview_win = tk.Toplevel(self.root)
+        self._preview_win.title("FocusFlow — Capture Preview")
+        self._preview_win.configure(bg="#1a1a2e")
+        self._preview_win.attributes("-topmost", True)
+
+        try:
+            self.guard.protect_all_tk_windows(self._preview_win)
+        except Exception as e:
+            logger.error(f"[Preview] Failed to protect preview window: {e}")
+
+        photo = ImageTk.PhotoImage(self._last_image)
+        self._preview_win.photo = photo  # keep reference
+        
+        lbl = tk.Label(self._preview_win, image=photo, bg="#1a1a2e")
+        lbl.pack(fill=tk.BOTH, expand=True)
+
+        w, h = self._last_image.size
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        x = (screen_w - w) // 2
+        y = (screen_h - h) // 2
+        self._preview_win.geometry(f"{w}x{h}+{max(0, x)}+{max(0, y)}")
+
+        def _on_close():
+            if hasattr(self, "_preview_win") and self._preview_win is not None:
+                try:
+                    self._preview_win.destroy()
+                except Exception:
+                    pass
+                self._preview_win = None
+
+        self._preview_win.protocol("WM_DELETE_WINDOW", _on_close)
+
     def _on_solve_hotkey(self) -> None:
         """Called from hotkey thread — schedule solve on main thread."""
         self.root.after(0, self._on_solve)
@@ -364,7 +424,11 @@ class FocusFlowApp:
             return
         self.pipeline.log("\n--- Solving ---")
         self.answer.set_system_message("[System] Capturing screen...")
-
+ 
+        # Hide panels immediately so they don't block the screen capture
+        self._hide_panels()
+        self.root.update_idletasks()
+ 
         # Run in thread to avoid UI freeze
         threading.Thread(target=self._solve_pipeline, args=(False,), daemon=True).start()
 
@@ -408,7 +472,11 @@ class FocusFlowApp:
                 except Exception as e:
                     self._log_safe(f"[Capture] Error: {e}")
                     self._set_answer_safe(f"[Error] Screen capture failed: {e}")
+                    self.root.after(0, self._show_panels)
                     return
+ 
+                # Restore panels immediately after capture is complete
+                self.root.after(0, self._show_panels)
 
                 # 2. Save screenshot if enabled
                 screenshot_path = ""
@@ -444,22 +512,27 @@ class FocusFlowApp:
             except Exception:
                 pass
 
-            if not cleaned_text.strip():
-                self._set_answer_safe("[No text detected] Try adjusting the capture region.")
-                return
-
             # 5. AI Solve
             self._set_system_safe("[System] Sending to AI...")
             t_llm = time.perf_counter()
 
             mode = self.config.get("mode", "combined")
             send_mode = self.config.get("online_send_mode", "ocr")
+            effective_mode = self.ai._effective_mode()
+
+            is_vision_mode = (effective_mode == "online" and send_mode in ("image", "both"))
+
+            if not cleaned_text.strip() and not is_vision_mode:
+                self._set_answer_safe("[No text detected] Try adjusting the capture region.")
+                return
 
             # Determine if we should send image
-            send_image = None
-            effective_mode = self.ai._effective_mode()
-            if effective_mode == "online" and send_mode in ("image", "both"):
-                send_image = image
+            send_image = image if is_vision_mode else None
+
+            # If text is empty in vision mode, use a placeholder
+            if not cleaned_text.strip() and is_vision_mode:
+                cleaned_text = "[Solve the question in the image]"
+                self._last_ocr_text = cleaned_text
 
             result = self.ai.solve(cleaned_text, image=send_image)
             llm_duration = round(time.perf_counter() - t_llm, 2)
@@ -469,6 +542,7 @@ class FocusFlowApp:
 
             self._log_safe(f"[AI] Answer in {llm_duration}s via {engine} ({len(answer)} chars)")
             self._set_answer_safe(answer)
+            self._last_ai_answer = answer.strip()
 
             # Reset conversation chat history with the new capture solve
             self._chat_history = [
@@ -552,6 +626,7 @@ class FocusFlowApp:
                 duration = result.get("duration", 0)
                 self._log_safe(f"[AI] Manual answer in {duration}s via {engine}")
                 self._set_answer_safe(answer)
+                self._last_ai_answer = answer.strip()
 
                 # Reset conversation chat history with the new manual solve
                 self._chat_history = [
@@ -619,7 +694,8 @@ class FocusFlowApp:
                 self.config,
                 run_mode=self.run_mode,
                 on_save=self._on_settings_saved,
-                on_opacity_preview=self._set_opacity
+                on_opacity_preview=self._set_opacity,
+                on_quit=self.root.destroy
             )
             # Protect the settings window too
             self._settings_dialog.update_idletasks()
@@ -836,6 +912,33 @@ class FocusFlowApp:
         except Exception:
             logger.debug("UI dispatch failed: %s", msg)
 
+    def check_clipboard(self) -> None:
+        """Poll the system clipboard on the main thread and auto-solve new text."""
+        if not self._cleaned_up and self.config.get("clipboard_monitor_enabled", False):
+            try:
+                text = self.root.clipboard_get()
+                if text and text.strip():
+                    stripped = text.strip()
+                    # Guard checks to prevent infinite loops / self-solving
+                    not_last_clip = stripped != self._last_clipboard_text
+                    not_last_solve = stripped != self._last_ocr_text
+                    not_last_raw = stripped != self._last_raw_text
+                    not_last_answer = stripped != self._last_ai_answer
+                    
+                    if not_last_clip and not_last_solve and not_last_raw and not_last_answer:
+                        self._last_clipboard_text = stripped
+                        self.pipeline.log(f"[Clipboard] New text detected, auto-solving...")
+                        self._solve_manual_text(stripped)
+            except Exception:
+                pass
+        
+        # Schedule next check in 1000ms
+        if not self._cleaned_up:
+            try:
+                self.root.after(1000, self.check_clipboard)
+            except Exception:
+                pass
+ 
     # ==================================================================
     # Run
     # ==================================================================
@@ -855,6 +958,12 @@ class FocusFlowApp:
             return
         self._cleaned_up = True
         logger.info("[Shutdown] Cleaning up...")
+        if hasattr(self, "_preview_win") and self._preview_win is not None:
+            try:
+                self._preview_win.destroy()
+            except Exception:
+                pass
+            self._preview_win = None
         self.guard.stop()
         self.ai.stop()
         try:

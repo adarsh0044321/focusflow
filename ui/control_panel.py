@@ -55,6 +55,8 @@ class ControlPanel(tk.Toplevel):
         self._on_history: Optional[Callable[[], None]] = None
         self._on_manual_send: Optional[Callable[[str], None]] = None
         self._on_mode_change: Optional[Callable[[str, Optional[str]], None]] = None
+        self._on_close: Optional[Callable[[], None]] = None
+        self._on_quit: Optional[Callable[[], None]] = None
 
         # --- Tk variables ---------------------------------------------------
         self._mode_var = tk.StringVar(value=self.config.get("mode", "offline"))
@@ -111,7 +113,7 @@ class ControlPanel(tk.Toplevel):
             bar, text="✕", font=FONT_MAIN, fg=FG_DIM, bg=BG_PANEL, cursor="hand2"
         )
         close_btn.pack(side=tk.RIGHT, padx=4)
-        close_btn.bind("<Button-1>", lambda _e: self.withdraw())
+        close_btn.bind("<Button-1>", lambda _e: self._handle_close())
 
         # --- Drag bindings --------------------------------------------------
         self._drag_data: dict[str, int] = {"x": 0, "y": 0}
@@ -181,6 +183,7 @@ class ControlPanel(tk.Toplevel):
             ("Region Active", FG_GREEN, BG_DARK, self._handle_region),
             ("History", ACCENT_PURPLE, BG_DARK, self._handle_history),
             ("Settings", "#20b2aa", BG_DARK, self._handle_settings),
+            ("Quit", FG_RED, BG_DARK, self._handle_quit),
         ]
 
         for text, fg_colour, bg_colour, handler in tab_defs:
@@ -193,12 +196,12 @@ class ControlPanel(tk.Toplevel):
                 activebackground=fg_colour,
                 activeforeground=BG_DARK,
                 relief=tk.FLAT,
-                padx=12,
+                padx=8,
                 pady=3,
                 cursor="hand2",
                 command=handler,
             )
-            btn.pack(side=tk.LEFT, padx=3)
+            btn.pack(side=tk.LEFT, padx=2)
 
     # ======================================================================
     # Mode selector (Offline / Online / Combined)
@@ -412,6 +415,22 @@ class ControlPanel(tk.Toplevel):
             except Exception:
                 logger.exception("Error in history callback")
 
+    def _handle_close(self) -> None:
+        if self._on_close:
+            try:
+                self._on_close()
+            except Exception:
+                logger.exception("Error in close callback")
+        else:
+            self.withdraw()
+
+    def _handle_quit(self) -> None:
+        if self._on_quit:
+            try:
+                self._on_quit()
+            except Exception:
+                logger.exception("Error in quit callback")
+
     def _handle_manual_send(self) -> None:
         text = self.get_manual_text()
         if not text:
@@ -475,6 +494,14 @@ class ControlPanel(tk.Toplevel):
     def set_on_history(self, callback: Callable[[], None]) -> None:
         """Register a callback for the History button."""
         self._on_history = callback
+
+    def set_on_close(self, callback: Callable[[], None]) -> None:
+        """Register a callback for the titlebar Close button."""
+        self._on_close = callback
+
+    def set_on_quit(self, callback: Callable[[], None]) -> None:
+        """Register a callback for the Quit button."""
+        self._on_quit = callback
 
     def set_on_manual_send(
         self,
