@@ -166,17 +166,18 @@ class HistoryManager:
             count = len(self._entries)
             self._backup()
             self._entries.clear()
-            self._save()
+            self._save(skip_backup=True)
         logger.info("History cleared  (removed %d entries)", count)
 
     # ------------------------------------------------------------------
     # Persistence helpers
     # ------------------------------------------------------------------
 
-    def _save(self) -> None:
+    def _save(self, skip_backup: bool = False) -> None:
         """Write ``_entries`` to JSON, creating a backup first."""
         with self._lock:
-            self._backup()
+            if not skip_backup:
+                self._backup()
             try:
                 self.history_path.parent.mkdir(parents=True, exist_ok=True)
 
