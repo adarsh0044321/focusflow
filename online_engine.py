@@ -125,14 +125,18 @@ class OnlineEngine:
         messages_or_input: Any,
         max_tokens: int,
         temperature: float,
+        system_prompt: str = "",
     ) -> str:
         """Send query using responses API with fallback to chat completions."""
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
             try:
-                # Try custom/deprecated responses API format
+                # responses API takes a combined input string
+                combined = messages_or_input
+                if system_prompt.strip() and isinstance(messages_or_input, str):
+                    combined = f"{system_prompt.strip()}\n\nQuestion:\n{messages_or_input}"
                 response = client.responses.create(
                     model=model,
-                    input=messages_or_input,
+                    input=combined,
                 )
                 if response and getattr(response, "output_text", None):
                     return response.output_text.strip()
@@ -140,11 +144,15 @@ class OnlineEngine:
                 self.logger.warning(f"[API] Custom responses API failed: {exc}. Falling back.")
 
         # Standard OpenAI chat completions fallback
+        chat_messages = []
+        if system_prompt.strip():
+            chat_messages.append({"role": "system", "content": system_prompt.strip()})
+            
         if isinstance(messages_or_input, str):
-            chat_messages = [{"role": "user", "content": messages_or_input}]
+            chat_messages.append({"role": "user", "content": messages_or_input})
         else:
             # messages_or_input is already structured payload list
-            chat_messages = [{"role": "user", "content": messages_or_input}]
+            chat_messages.append({"role": "user", "content": messages_or_input})
 
         response = client.chat.completions.create(
             model=model,
@@ -169,10 +177,6 @@ class OnlineEngine:
         max_tokens: int = int(self.config.get("online_max_tokens", 1000))
         temperature: float = float(self.config.get("online_temperature", 0.2))
 
-        full_input = prompt.strip()
-        if system_prompt.strip():
-            full_input = f"{system_prompt.strip()}\n\nQuestion:\n{full_input}"
-
         last_error: Optional[Exception] = None
         for attempt in range(self._MAX_RETRIES):
             try:
@@ -184,9 +188,10 @@ class OnlineEngine:
                 answer = self._request_completion(
                     client=client,
                     model=model,
-                    messages_or_input=full_input,
+                    messages_or_input=prompt.strip(),
                     max_tokens=max_tokens,
                     temperature=temperature,
+                    system_prompt=system_prompt,
                 )
                 if answer:
                     return answer
@@ -276,12 +281,8 @@ class OnlineEngine:
             self.logger.error(f"[API] Failed to encode image: {exc}")
             return f"[Error] Image encoding failed: {exc}"
 
-        full_input = prompt.strip()
-        if system_prompt.strip():
-            full_input = f"{system_prompt.strip()}\n\nQuestion:\n{full_input}"
-
         input_payload = [
-            {"type": "text", "text": full_input},
+            {"type": "text", "text": prompt.strip()},
             {
                 "type": "image_url",
                 "image_url": {
@@ -304,6 +305,7 @@ class OnlineEngine:
                     messages_or_input=input_payload,
                     max_tokens=max_tokens,
                     temperature=temperature,
+                    system_prompt=system_prompt,
                 )
                 if answer:
                     return answer
