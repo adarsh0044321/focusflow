@@ -44,6 +44,7 @@ _UI_ARTIFACT_PATTERNS: list[re.Pattern[str]] = [
         r"\bSponsored\b",
         r"\bSkip\s+to\s+content\b",
         r"\bSearch\s*\.\.\.\s*$",
+        r"\bFocusFlow\b",
     )
 ]
 
