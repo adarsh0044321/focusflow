@@ -127,7 +127,7 @@ class KnowledgeBase:
             if w.endswith("ies"):
                 return w[:-3] + "y"
             if w.endswith("ves"):
-                return w[:-1]
+                return w[:-3] + "f"
             if w.endswith("es") and not w.endswith("ss"):
                 return w[:-2]
             if w.endswith("s") and not w.endswith("ss"):
