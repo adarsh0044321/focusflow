@@ -131,6 +131,7 @@ class OCREngine:
         # 5. Thresholding → binary
         if self.config.get("ocr_preprocess_threshold", True):
             threshold_val: int = self.config.get("ocr_threshold_value", 128)
+            threshold_val = max(0, min(255, int(threshold_val)))
             gray = img.convert("L")
             img = gray.point(lambda p: 255 if p > threshold_val else 0, mode="1")
             self.logger.debug(
