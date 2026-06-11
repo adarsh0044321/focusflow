@@ -200,7 +200,7 @@ class HistoryManager:
             try:
                 shutil.copy2(str(self.history_path), str(self.backup_path))
                 logger.debug("History backup created  %s", self.backup_path)
-            except OSError as exc:
+            except Exception as exc:
                 logger.warning("Failed to create history backup: %s", exc)
 
     def _load(self) -> None:
