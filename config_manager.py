@@ -262,6 +262,10 @@ class ConfigManager:
         if not key or not isinstance(key, str):
             logger.warning("Attempted to add empty or invalid API key")
             return
+        key = key.strip()
+        if not key:
+            logger.warning("Attempted to add empty API key after stripping")
+            return
         with self._lock:
             keys = self.get_api_keys()
             if key not in keys:
