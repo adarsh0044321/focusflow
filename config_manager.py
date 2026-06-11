@@ -73,6 +73,9 @@ DEFAULTS: dict[str, Any] = {
 }
 
 
+_MISSING = object()
+
+
 class ConfigManager:
     """Manages application settings with JSON persistence.
 
@@ -129,16 +132,16 @@ class ConfigManager:
     # Core CRUD
     # ------------------------------------------------------------------
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: Any = _MISSING) -> Any:
         """Return the value for *key*, falling back to *default*.
 
-        If *default* is ``None`` and the key exists in ``DEFAULTS``, the
+        If *default* is not provided and the key exists in ``DEFAULTS``, the
         global default is returned instead.
         """
         with self._lock:
             if key in self._settings:
                 return self._settings[key]
-            if default is not None:
+            if default is not _MISSING:
                 return default
             return DEFAULTS.get(key)
 
