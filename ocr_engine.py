@@ -226,7 +226,7 @@ class OCREngine:
 
             # --- read output -------------------------------------------------
             try:
-                with open(tmp_out_txt, "r", encoding="utf-8", errors="replace") as fh:
+                with open(tmp_out_txt, "r", encoding="utf-8-sig", errors="replace") as fh:
                     text = fh.read()
             except FileNotFoundError:
                 self.logger.error("Tesseract output file not found.")
