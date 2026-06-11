@@ -30,6 +30,7 @@ class OfflineEngine:
             self._status = "Not started"
         self._health_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        self._lifecycle_lock = threading.Lock()
 
     def _set_status(self, value: str) -> None:
         with self._status_lock:
@@ -54,28 +55,33 @@ class OfflineEngine:
 
     def start(self) -> None:
         """Start the llama.cpp server in the background."""
-        self._start_llamacpp()
+        with self._lifecycle_lock:
+            if self._server_process is not None:
+                self.logger.warning("[LLM] Server process already running - skip start")
+                return
+            self._start_llamacpp()
 
     def stop(self) -> None:
         """Stop the server process and clean up."""
-        self._stop_event.set()
-        self._ready_event.clear()
-        if self._server_process is not None:
-            try:
-                self.logger.info("[LLM] Terminating server process...")
-                self._server_process.terminate()
+        with self._lifecycle_lock:
+            self._stop_event.set()
+            self._ready_event.clear()
+            if self._server_process is not None:
                 try:
-                    self._server_process.wait(timeout=3)
-                    self.logger.info("[LLM] Server process terminated")
-                except subprocess.TimeoutExpired:
-                    self._server_process.kill()
-                    self._server_process.wait(timeout=2)
-                    self.logger.warning("[LLM] Server process killed after timeout")
-            except Exception as exc:
-                self.logger.error(f"[LLM] Error stopping server: {exc}")
-            finally:
-                self._server_process = None
-        self._set_status("Stopped")
+                    self.logger.info("[LLM] Terminating server process...")
+                    self._server_process.terminate()
+                    try:
+                        self._server_process.wait(timeout=3)
+                        self.logger.info("[LLM] Server process terminated")
+                    except subprocess.TimeoutExpired:
+                        self._server_process.kill()
+                        self._server_process.wait(timeout=2)
+                        self.logger.warning("[LLM] Server process killed after timeout")
+                except Exception as exc:
+                    self.logger.error(f"[LLM] Error stopping server: {exc}")
+                finally:
+                    self._server_process = None
+            self._set_status("Stopped")
 
     def is_ready(self) -> bool:
         """Return True when the backend is loaded and responsive."""
