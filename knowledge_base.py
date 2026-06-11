@@ -178,4 +178,5 @@ class KnowledgeBase:
 
         ``"organic_chemistry"`` → ``"Organic Chemistry"``
         """
-        return stem.replace("_", " ").replace("-", " ").strip().title()
+        cleaned = stem.replace("_", " ").replace("-", " ").strip().title()
+        return re.sub(r"\s+", " ", cleaned)
