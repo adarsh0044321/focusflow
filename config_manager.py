@@ -308,11 +308,12 @@ class ConfigManager:
             if not keys:
                 logger.warning("No API keys configured")
                 return None
-            key = keys[self._api_key_index % len(keys)]
-            self._api_key_index = (self._api_key_index + 1) % len(keys)
+            current_index = self._api_key_index % len(keys)
+            key = keys[current_index]
+            self._api_key_index = (current_index + 1) % len(keys)
             logger.debug(
                 "API key rotated  index=%d/%d",
-                self._api_key_index,
+                current_index,
                 len(keys),
             )
             return key
