@@ -134,7 +134,7 @@ class KnowledgeBase:
                 return w[:-1]
             if w.endswith("ing") and len(w) > 6:
                 return w[:-3]
-            if w.endswith("ed"):
+            if w.endswith("ed") and len(w) > 5:
                 return w[:-2]
         return w
 
