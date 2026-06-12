@@ -283,6 +283,11 @@ class ControlPanel(tk.Toplevel):
         self.config.set("ai_persona", code_name)
         logger.info(f"AI Persona changed to: {code_name}")
 
+    def _handle_send_mode_change(self) -> None:
+        new_mode = self._send_mode_var.get()
+        self.config.set("online_send_mode", new_mode)
+        logger.info(f"Online send mode changed to: {new_mode}")
+
     # ======================================================================
     # Region info line
     # ======================================================================
@@ -331,6 +336,7 @@ class ControlPanel(tk.Toplevel):
                 activeforeground=FG_GREEN,
                 indicatoron=True,
                 cursor="hand2",
+                command=self._handle_send_mode_change,
             )
             rb.pack(side=tk.LEFT, padx=6)
 
