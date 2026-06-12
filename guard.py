@@ -65,6 +65,7 @@ class CaptureGuard:
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self._pid: int = os.getpid()
+        self._current_callback: Any = None
 
         if user32 is None:
             logger.warning(
