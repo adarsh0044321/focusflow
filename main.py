@@ -716,14 +716,17 @@ class FocusFlowApp:
 
     def _on_history(self) -> None:
         """Open history viewer dialog."""
-        if self._history_dialog is not None and self._history_dialog.winfo_exists():
-            try:
-                self._history_dialog.lift()
-                self._history_dialog.focus_force()
-                self._history_dialog.reload_history()
-            except Exception:
-                pass
-            return
+        if self._history_dialog is not None:
+            if self._history_dialog.winfo_exists():
+                try:
+                    self._history_dialog.lift()
+                    self._history_dialog.focus_force()
+                    self._history_dialog.reload_history()
+                except Exception:
+                    pass
+                return
+            else:
+                self._history_dialog = None
 
         try:
             from ui.history_viewer import HistoryViewerDialog
