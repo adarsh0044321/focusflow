@@ -621,7 +621,8 @@ class FocusFlowApp:
             logger.warning("[Solve] Skip manual question — solver already busy")
             self.pipeline.log("[Solve] Skip manual question — solver already busy")
             return
-        self.pipeline.log(f"\n--- Manual Question ---\n{question[:100]}...")
+        preview = question[:100] + ("..." if len(question) > 100 else "")
+        self.pipeline.log(f"\n--- Manual Question ---\n{preview}")
         self.answer.set_system_message("[System] Processing manual question...")
 
         def _solve():
