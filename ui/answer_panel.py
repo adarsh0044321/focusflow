@@ -375,12 +375,12 @@ class AnswerPanel(tk.Frame):
         text = self._chat_entry.get().strip()
         if not text:
             return
-        self._chat_entry.delete(0, tk.END)
         if self._on_chat_send:
             try:
                 self._on_chat_send(text)
             except Exception as exc:
                 logger.error("Chat send callback error: %s", exc)
+        self._chat_entry.delete(0, tk.END)
 
     def set_on_chat_send(self, callback: Callable[[str], None]) -> None:
         """Register a callback for the follow-up chat Send action."""
