@@ -688,13 +688,16 @@ class FocusFlowApp:
 
     def _on_settings(self) -> None:
         """Open settings dialog."""
-        if self._settings_dialog is not None and self._settings_dialog.winfo_exists():
-            try:
-                self._settings_dialog.lift()
-                self._settings_dialog.focus_force()
-            except Exception:
-                pass
-            return
+        if self._settings_dialog is not None:
+            if self._settings_dialog.winfo_exists():
+                try:
+                    self._settings_dialog.lift()
+                    self._settings_dialog.focus_force()
+                except Exception:
+                    pass
+                return
+            else:
+                self._settings_dialog = None
 
         try:
             self._settings_dialog = SettingsDialog(
