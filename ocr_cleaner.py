@@ -228,6 +228,7 @@ class OCRCleaner:
             return m.group(1) + "O" + m.group(2)
 
         text = re.sub(r"([A-Z])0([A-Z])", _zero_to_o, text)
+        text = re.sub(r"([A-Z])0([A-Z])", _zero_to_o, text)
 
         # O → 0 when surrounded by digits
         def _o_to_zero(m: re.Match[str]) -> str:
@@ -235,6 +236,7 @@ class OCRCleaner:
             fixes += 1
             return m.group(1) + "0" + m.group(2)
 
+        text = re.sub(r"(\d)O(\d)", _o_to_zero, text)
         text = re.sub(r"(\d)O(\d)", _o_to_zero, text)
 
         return text, fixes
