@@ -241,7 +241,18 @@ class OfflineEngine:
             if retries >= max_retries:
                 self._set_status("Timeout: model failed to load")
                 self.logger.error("[LLM] Timeout waiting for model to load. Killing server.")
-                self.stop()
+                self._stop_event.set()
+                if self._server_process is not None:
+                    try:
+                        self._server_process.terminate()
+                        self._server_process.wait(timeout=3)
+                    except Exception:
+                        try:
+                            self._server_process.kill()
+                        except Exception:
+                            pass
+                    self._server_process = None
+                self._set_status("Stopped")
                 return
 
             self._set_status(f"Loading model... ({retries * 2}s elapsed)")
