@@ -123,6 +123,12 @@ class OCREngine:
         # 4. Denoising (median filter)
         if self.config.get("ocr_preprocess_denoise", True):
             median_size: int = self.config.get("ocr_median_size", 3)
+            try:
+                median_size = max(1, int(median_size))
+                if median_size % 2 == 0:
+                    median_size += 1
+            except (TypeError, ValueError):
+                median_size = 3
             img = img.filter(ImageFilter.MedianFilter(size=median_size))
             self.logger.debug(
                 "Preprocessing: median denoise (size %d) applied.", median_size
