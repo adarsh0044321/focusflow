@@ -172,7 +172,6 @@ class FocusFlowApp:
             self.config.set("first_run", False)
  
         # ── Clipboard Monitor ────────────────────────────────────────
-        self._last_clipboard_text = ""
         try:
             self._last_clipboard_text = self.root.clipboard_get().strip()
         except Exception:
