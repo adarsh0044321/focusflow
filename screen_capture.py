@@ -76,7 +76,10 @@ class ScreenCapture:
         mode: str = self.config.get("capture_mode", "fullscreen")
         if mode == "region":
             return self.capture_region()
-        monitor_idx = int(self.config.get("capture_monitor_index", 1))
+        try:
+            monitor_idx = int(self.config.get("capture_monitor_index", 1))
+        except (TypeError, ValueError):
+            monitor_idx = 1
         return self.capture_fullscreen(monitor_index=monitor_idx)
 
     # ------------------------------------------------------------------
