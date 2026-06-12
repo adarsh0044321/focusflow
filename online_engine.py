@@ -150,9 +150,11 @@ class OnlineEngine:
             
         if isinstance(messages_or_input, str):
             chat_messages.append({"role": "user", "content": messages_or_input})
-        else:
-            # messages_or_input is already structured payload list
+        elif isinstance(messages_or_input, list):
+            # Vision payload: list of content parts (text + image_url)
             chat_messages.append({"role": "user", "content": messages_or_input})
+        else:
+            chat_messages.append({"role": "user", "content": str(messages_or_input)})
 
         response = client.chat.completions.create(
             model=model,
