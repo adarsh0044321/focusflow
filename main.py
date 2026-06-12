@@ -591,8 +591,14 @@ class FocusFlowApp:
             if val:
                 # Remove surrounding markdown symbols like bold asterisks if present
                 val = val.replace("**", "").replace("`", "").strip()
-                self.root.clipboard_clear()
-                self.root.clipboard_append(val)
+                # Schedule clipboard ops on the main thread (Tkinter is not thread-safe)
+                def _copy():
+                    try:
+                        self.root.clipboard_clear()
+                        self.root.clipboard_append(val)
+                    except Exception:
+                        pass
+                self.root.after(0, _copy)
                 self._log_safe(f"[System] Auto-copied '{val}' to clipboard!")
 
     def _on_manual_question(self) -> None:
