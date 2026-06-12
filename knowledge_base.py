@@ -132,7 +132,7 @@ class KnowledgeBase:
                 return w[:-2]
             if w.endswith("s") and not w.endswith("ss"):
                 return w[:-1]
-            if w.endswith("ing"):
+            if w.endswith("ing") and len(w) > 6:
                 return w[:-3]
             if w.endswith("ed"):
                 return w[:-2]
