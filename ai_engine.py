@@ -275,7 +275,7 @@ class AIEngine:
             if in_rules_section and re.match(r"^\d+\.\s", stripped):
                 if "ocr" in stripped.lower():
                     continue
-                rule_text = re.sub(r"^\d+\.\s*", "", line)
+                rule_text = re.sub(r"^\d+\.\s*", "", stripped)
                 leading_ws = line[:len(line) - len(line.lstrip())]
                 cleaned_lines.append(f"{leading_ws}{rule_counter}. {rule_text}")
                 rule_counter += 1
