@@ -837,7 +837,8 @@ class FocusFlowApp:
             self.pipeline.log("[Chat] Skip follow-up — solver busy")
             return
             
-        self.pipeline.log(f"\n--- Chat Follow-up ---\n> {text[:80]}...")
+        preview = text[:80] + ("..." if len(text) > 80 else "")
+        self.pipeline.log(f"\n--- Chat Follow-up ---\n> {preview}")
         self.answer.set_system_message("[System] Thinking...")
         self.answer.append_chat_message(text, is_user=True)
         
