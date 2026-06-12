@@ -663,11 +663,13 @@ class FocusFlowApp:
         self._hide_panels()
 
         def on_selected(x, y, w, h):
-            self.config.set("region_x", x)
-            self.config.set("region_y", y)
-            self.config.set("region_w", w)
-            self.config.set("region_h", h)
-            self.config.set("capture_mode", "region")
+            self.config.batch_update({
+                "region_x": x,
+                "region_y": y,
+                "region_w": w,
+                "region_h": h,
+                "capture_mode": "region",
+            })
             self.controls.update_region_display(w, h)
             self.pipeline.log(f"[Region] Set to ({x}, {y}) {w}x{h}")
             # Show panels again
