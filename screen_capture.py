@@ -38,7 +38,7 @@ class ScreenCapture:
             0-based or 1-based index into ``mss.monitors``.  Index 0 is the
             virtual screen that spans *all* monitors.
         """
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             idx = min(max(0, monitor_index), len(sct.monitors) - 1)
             raw = sct.grab(sct.monitors[idx])
             return Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
@@ -63,7 +63,7 @@ class ScreenCapture:
             return self.capture_fullscreen()
 
         region = {"left": x, "top": y, "width": w, "height": h}
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             raw = sct.grab(region)
             return Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
 
@@ -146,7 +146,7 @@ class _RegionSelector:
 
         # Get total virtual screen dimensions from mss across all monitors
         try:
-            with mss.mss() as sct:
+            with mss.MSS() as sct:
                 # sct.monitors[0] is the virtual monitor containing all screens
                 mon = sct.monitors[0]
                 left = mon["left"]
