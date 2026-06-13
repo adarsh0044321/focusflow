@@ -84,6 +84,15 @@ class SettingsDialog(tk.Toplevel):
         self.attributes("-topmost", True)
 
         # --- Tk variables (bound to widgets, synced to config) --------------
+        def _get_config_int(key: str, fallback: int) -> int:
+            try:
+                val = config.get(key, fallback)
+                if val is None:
+                    return fallback
+                return int(val)
+            except (ValueError, TypeError):
+                return fallback
+
         self._mode_var = tk.StringVar(value=config.get("mode", "offline"))
         self._send_mode_var = tk.StringVar(
             value=config.get("online_send_mode", "ocr")
@@ -93,19 +102,19 @@ class SettingsDialog(tk.Toplevel):
         self._model_path_var = tk.StringVar(
             value=config.get("llm_model_path", "")
         )
-        self._threads_var = tk.IntVar(value=config.get("llm_threads", 4))
-        self._gpu_layers_var = tk.IntVar(value=config.get("llm_gpu_layers", 0))
+        self._threads_var = tk.IntVar(value=_get_config_int("llm_threads", 4))
+        self._gpu_layers_var = tk.IntVar(value=_get_config_int("llm_gpu_layers", 0))
         self._ctx_len_var = tk.IntVar(
-            value=config.get("llm_context_length", 2048)
+            value=_get_config_int("llm_context_length", 2048)
         )
 
         self._capture_mode_var = tk.StringVar(
             value=config.get("capture_mode", "region")
         )
-        self._region_x_var = tk.IntVar(value=config.get("region_x", 0))
-        self._region_y_var = tk.IntVar(value=config.get("region_y", 0))
-        self._region_w_var = tk.IntVar(value=config.get("region_w", 800))
-        self._region_h_var = tk.IntVar(value=config.get("region_h", 600))
+        self._region_x_var = tk.IntVar(value=_get_config_int("region_x", 0))
+        self._region_y_var = tk.IntVar(value=_get_config_int("region_y", 0))
+        self._region_w_var = tk.IntVar(value=_get_config_int("region_w", 800))
+        self._region_h_var = tk.IntVar(value=_get_config_int("region_h", 600))
 
         self._gray_var = tk.BooleanVar(
             value=config.get("ocr_preprocess_grayscale", True)
@@ -123,7 +132,7 @@ class SettingsDialog(tk.Toplevel):
             value=config.get("ocr_preprocess_threshold", False)
         )
 
-        self._opacity_var = tk.IntVar(value=config.get("opacity", 240))
+        self._opacity_var = tk.IntVar(value=_get_config_int("opacity", 240))
         self._answer_mode_var = tk.StringVar(
             value=config.get("answer_mode", "concise")
         )
@@ -154,7 +163,7 @@ class SettingsDialog(tk.Toplevel):
             self._monitor_names.append("Monitor 1")
             self._monitor_values.append(1)
 
-        active_idx = int(config.get("capture_monitor_index", 1))
+        active_idx = _get_config_int("capture_monitor_index", 1)
         if active_idx in self._monitor_values:
             matched_name = self._monitor_names[self._monitor_values.index(active_idx)]
         else:
