@@ -113,6 +113,8 @@ class OfflineEngine:
             binary: str = self.config.resolve_path(self.config.get("llm_binary"))
             model: str = self.config.resolve_path(self.config.get("llm_model_path"))
             port: int = int(self.config.get("llm_port"))
+            if not (1 <= port <= 65535):
+                raise ValueError(f"Port {port} is out of range [1, 65535]")
             ctx: int = int(self.config.get("llm_context_length"))
             threads: int = int(self.config.get("llm_threads"))
             gpu: int = int(self.config.get("llm_gpu_layers"))
