@@ -213,19 +213,23 @@ class HistoryViewerDialog(tk.Toplevel):
 
         for entry in self._entries:
             # Match search against timestamp, raw text, or answer
+            ts_str = str(entry.get("timestamp") or "")
+            ocr_str = str(entry.get("raw_ocr") or "")
+            ans_str = str(entry.get("answer") or "")
+
             text_match = (
-                query in entry.get("timestamp", "").lower()
-                or query in entry.get("raw_ocr", "").lower()
-                or query in entry.get("answer", "").lower()
+                query in ts_str.lower()
+                or query in ocr_str.lower()
+                or query in ans_str.lower()
             )
             if not query or text_match:
                 self._filtered_entries.append(entry)
                 
                 # Format list item
-                ts = entry.get("timestamp", "N/A")
-                mode = entry.get("mode", "offline").upper()
-                snippet = entry.get("raw_ocr", "")[:30].strip().replace("\n", " ")
-                if len(entry.get("raw_ocr", "")) > 30:
+                ts = entry.get("timestamp") or "N/A"
+                mode = str(entry.get("mode") or "offline").upper()
+                snippet = ocr_str[:30].strip().replace("\n", " ")
+                if len(ocr_str) > 30:
                     snippet += "..."
                 
                 self._listbox.insert(tk.END, f"{ts} [{mode}] {snippet}")
