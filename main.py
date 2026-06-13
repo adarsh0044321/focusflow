@@ -193,12 +193,17 @@ class FocusFlowApp:
         panel_w = 420
         panel_h = 500
 
+        # Center all 3 panels horizontally and vertically
+        total_width = 3 * panel_w + 20
+        start_x = max(10, (screen_w - total_width) // 2)
+        start_y = max(10, (screen_h - panel_h) // 2)
+
         # Pipeline panel (left)
         self.pipeline_win = tk.Toplevel(self.root)
         self.pipeline_win.overrideredirect(True)
         self.pipeline_win.attributes("-topmost", True)
         self.pipeline_win.configure(bg="#1a1a2e")
-        self.pipeline_win.geometry(f"{panel_w}x{panel_h}+10+50")
+        self.pipeline_win.geometry(f"{panel_w}x{panel_h}+{start_x}+{start_y}")
         opacity = self.config.get("opacity", 240)
         self.pipeline_win.attributes("-alpha", opacity / 255.0)
         self.pipeline = PipelinePanel(self.pipeline_win)
@@ -206,7 +211,7 @@ class FocusFlowApp:
 
         # Control panel (center)
         self.controls = ControlPanel(self.root, self.config, run_mode=self.run_mode)
-        self.controls.geometry(f"{panel_w}x{panel_h}+{10 + panel_w + 10}+50")
+        self.controls.geometry(f"{panel_w}x{panel_h}+{start_x + panel_w + 10}+{start_y}")
         self.controls.attributes("-alpha", opacity / 255.0)
 
         # Answer panel (right)
@@ -215,7 +220,7 @@ class FocusFlowApp:
         self.answer_win.attributes("-topmost", True)
         self.answer_win.configure(bg="#1a1a2e")
         self.answer_win.geometry(
-            f"{panel_w}x{panel_h}+{10 + (panel_w + 10) * 2}+50"
+            f"{panel_w}x{panel_h}+{start_x + (panel_w + 10) * 2}+{start_y}"
         )
         self.answer_win.attributes("-alpha", opacity / 255.0)
         self.answer = AnswerPanel(self.answer_win)
