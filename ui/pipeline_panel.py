@@ -212,14 +212,15 @@ class PipelinePanel(tk.Frame):
                      When *message* contains ``"load"`` (case-insensitive) and
                      *ready* is ``False``, an amber dot is shown instead.
         """
-        if not ready and "load" in message.lower():
+        message_str = str(message)
+        if not ready and "load" in message_str.lower():
             color = FG_GOLD  # amber while loading
         elif ready:
             color = FG_GREEN
         else:
             color = FG_RED
         self._llm_dot.configure(fg=color)
-        self._llm_label.configure(text=f"  LLM: {message}")
+        self._llm_label.configure(text=f"  LLM: {message_str}")
         logger.debug("LLM status -> %s (ready=%s)", message, ready)
 
     def log(self, message: str) -> None:
