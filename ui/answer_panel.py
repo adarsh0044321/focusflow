@@ -297,6 +297,7 @@ class AnswerPanel(tk.Frame):
                 self.set_system_message("[System] No answer to copy.")
         except Exception as exc:
             logger.error("Failed to copy to clipboard: %s", exc)
+            self.set_system_message("[Error] Clipboard locked — try again.")
 
     # ------------------------------------------------------------------
     # Public API
