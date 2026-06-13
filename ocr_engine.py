@@ -191,6 +191,10 @@ class OCREngine:
                 return "", f"Image save error: {exc}"
 
             # --- build command -----------------------------------------------
+            lang = self.config.get("ocr_lang", "eng")
+            if not isinstance(lang, str) or not lang.strip():
+                lang = "eng"
+
             cmd: list[str] = [
                 str(self.tesseract_path),
                 tmp_in,
@@ -198,7 +202,7 @@ class OCREngine:
                 "--psm", "3",
                 "--oem", "3",
                 "-c", "preserve_interword_spaces=1",
-                "-l", self.config.get("ocr_lang", "eng"),
+                "-l", lang,
             ]
 
             if self.tessdata_dir and os.path.isdir(self.tessdata_dir):
@@ -207,12 +211,20 @@ class OCREngine:
             self.logger.debug("Running: %s", " ".join(cmd))
 
             # --- execute Tesseract -------------------------------------------
+            timeout_val = self.config.get("ocr_timeout", 30)
+            try:
+                timeout_val = int(timeout_val)
+                if timeout_val <= 0:
+                    timeout_val = 30
+            except (TypeError, ValueError):
+                timeout_val = 30
+
             try:
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
-                    timeout=self.config.get("ocr_timeout", 30),
+                    timeout=timeout_val,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
             except FileNotFoundError:
