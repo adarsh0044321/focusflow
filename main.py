@@ -915,7 +915,7 @@ class FocusFlowApp:
 
     def _on_opacity_down_main(self) -> None:
         current = self.config.get("opacity", 240)
-        new_val = max(50, current - 15)
+        new_val = max(30, current - 15)
         self._set_opacity(new_val)
 
     def _set_opacity(self, value: int) -> None:
