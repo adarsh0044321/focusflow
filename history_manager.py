@@ -167,6 +167,11 @@ class HistoryManager:
             self._backup()
             self._entries.clear()
             self._save(skip_backup=True)
+            if self.screenshot_dir.exists():
+                try:
+                    shutil.rmtree(self.screenshot_dir)
+                except Exception as exc:
+                    logger.warning("Failed to clean up screenshot directory: %s", exc)
         logger.info("History cleared  (removed %d entries)", count)
 
     # ------------------------------------------------------------------
