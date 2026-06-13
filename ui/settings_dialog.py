@@ -806,8 +806,11 @@ class SettingsDialog(tk.Toplevel):
 
             self.config.batch_update(updates)
             logger.info("Settings saved via dialog batch update with input validation")
-        except Exception:
+        except Exception as e:
             logger.exception("Error saving settings")
+            from tkinter import messagebox
+            messagebox.showerror("Save Error", f"Failed to save settings: {e}")
+            return
 
         if self.on_save is not None:
             try:
