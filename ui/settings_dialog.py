@@ -145,7 +145,7 @@ class SettingsDialog(tk.Toplevel):
         self._monitor_values = [0]
         try:
             import mss
-            with mss.mss() as sct:
+            with mss.MSS() as sct:
                 for i in range(1, len(sct.monitors)):
                     m = sct.monitors[i]
                     self._monitor_names.append(f"Monitor {i} ({m['width']}x{m['height']})")
