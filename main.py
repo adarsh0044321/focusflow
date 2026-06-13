@@ -394,15 +394,36 @@ class FocusFlowApp:
         except Exception as e:
             logger.error(f"[Preview] Failed to protect preview window: {e}")
 
-        photo = ImageTk.PhotoImage(self._last_image)
+        # Scale image to fit screen dimensions nicely
+        img = self._last_image
+        w, h = img.size
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+
+        # Target width/height bounds
+        max_w = min(1200, screen_w - 200)
+        max_h = min(800, screen_h - 200)
+
+        if w > max_w or h > max_h:
+            ratio = min(max_w / w, max_h / h)
+            w = int(w * ratio)
+            h = int(h * ratio)
+            try:
+                from PIL import Image
+                resampler = Image.Resampling.LANCZOS
+            except AttributeError:
+                try:
+                    resampler = Image.LANCZOS
+                except AttributeError:
+                    resampler = Image.ANTIALIAS
+            img = img.resize((w, h), resampler)
+
+        photo = ImageTk.PhotoImage(img)
         self._preview_win.photo = photo  # keep reference
         
         lbl = tk.Label(self._preview_win, image=photo, bg="#1a1a2e")
         lbl.pack(fill=tk.BOTH, expand=True)
 
-        w, h = self._last_image.size
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
         x = (screen_w - w) // 2
         y = (screen_h - h) // 2
         self._preview_win.geometry(f"{w}x{h}+{max(0, x)}+{max(0, y)}")
