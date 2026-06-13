@@ -328,7 +328,11 @@ class HistoryViewerDialog(tk.Toplevel):
                     resampler = Image.LANCZOS
                 img = img.resize((w, h), resampler)
                 
-            popup.geometry(f"{w}x{h}+100+100")
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+            x = max(0, (screen_w - w) // 2)
+            y = max(0, (screen_h - h) // 2)
+            popup.geometry(f"{w}x{h}+{x}+{y}")
             
             photo = ImageTk.PhotoImage(img)
             label = tk.Label(popup, image=photo, bg=BG_DARK)
