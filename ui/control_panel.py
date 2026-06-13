@@ -441,6 +441,7 @@ class ControlPanel(tk.Toplevel):
         text = self.get_manual_text()
         if not text:
             return
+        self.clear_manual_text()
         if self._on_manual_send:
             try:
                 self._on_manual_send(text)
