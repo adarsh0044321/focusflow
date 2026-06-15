@@ -1,3 +1,24 @@
+# FocusFlow v1.3.0 — Unified AI Engine & Strict Lazy LLM Controller
+
+This release consolidates FocusFlow modes into a single unified application entry and provides optimized lazy lifecycle resource control for the offline LLM model.
+
+## 🚀 Key Features & Enhancements
+
+### ⚙️ 1. Unified Engine Selection
+* **UI Controls**: Exposes a unified `"AI MODEL ENGINE"` dropdown in settings allowing users to choose from Online (`gpt-4o`, `gpt-4o-mini`), Offline (`Phi-3 GGUF`), and Combined (Auto Hybrid) solve profiles.
+* **Auto-Fallback Routing**: Resolves the selected profile dynamically. In combined mode, queries the local offline LLM first, falling back to online APIs if the server is still loading or configured keys are available.
+
+### 🧠 2. Strict Lazy LLM Resource Controller
+* **Tab Visibility Detection**: Starts the offline LLM backend (`llama-server.exe`) dynamically only when the Study AI Doubts Solver panel/tab is actively visible/focused on the screen.
+* **Real-time Config Swaps**: Swapping model engine configs while the AI panel is active starts or terminates the local server immediately.
+* **Hard Memory Reclamation**: Triggers native `taskkill` on server stop. When the AI solver is minimized, closed, or the application itself is exited, any background `llama-server.exe` process is terminated immediately to free up 2.4GB of system RAM.
+
+### 📦 3. Consolidated Entry Point & Package Specification
+* **Single Specification**: Merged separate packaging specs into a single unified `FocusFlow.spec`.
+* **Legacy Wrappers Removed**: Deleted redundant spec manifests and launcher scripts (`main_online.py`, `main_offline.py`), wrapping all bootstrap controls inside `main.py`.
+
+---
+
 # FocusFlow v1.2.0 — Triple Mode Partitioning (Online, Offline, Combined)
 
 This release partitions FocusFlow into three distinct run configurations, allowing complete isolation of execution profiles, custom adaptive layouts, and dedicated packaging.

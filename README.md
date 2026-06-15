@@ -124,18 +124,18 @@ No Python installation or dependency setup is required.
    ```
 
 2. **Run Application**:
-   Start the application using one of the three target bootstrap launchers:
-   - **Combined (Hybrid) version**:
+   Start the application using the unified entry script. You can pass the `--mode` flag to override the default combined mode:
+   - **Combined (Hybrid) mode (Default)**:
      ```powershell
      python main.py
      ```
-   - **Online-Only version**:
+   - **Online-Only mode**:
      ```powershell
-     python main_online.py
+     python main.py --mode online
      ```
-   - **Offline-Only version**:
+   - **Offline-Only mode**:
      ```powershell
-     python main_offline.py
+     python main.py --mode offline
      ```
 
 ---
@@ -168,23 +168,22 @@ FocusFlow runs persistently in the background. Use the following global shortcut
 The repository is fully optimized for production packaging and git deployment:
 1. **Repository Hygiene**: The `.gitignore` is pre-configured to exclude large external binaries (`Tesseract-OCR`, `llama.cpp-master`, `svchost.exe`), model weights (`models/`), local database configurations (`data/settings.json`), logs, and screenshots.
 2. **Prerequisites for Release Build**:
-    To bundle FocusFlow into a standalone executable (without requiring Python to be installed on target machines), run the PyInstaller command for your target run mode profile:
-    - **Online Only**:
-      ```powershell
-      python -m PyInstaller FocusFlow-Online.spec --noconfirm
-      ```
-    - **Offline Only**:
-      ```powershell
-      python -m PyInstaller FocusFlow-Offline.spec --noconfirm
-      ```
-    - **Combined (Hybrid)**:
-      ```powershell
-      python -m PyInstaller FocusFlow-Combined.spec --noconfirm
-      ```
+    To bundle FocusFlow into a standalone executable (without requiring Python to be installed on target machines), run the PyInstaller command for the unified specification:
+    ```powershell
+    python -m PyInstaller FocusFlow.spec --noconfirm
+    ```
 
 ---
 
 ## 🆕 Release Notes
+
+### Version 1.3.0 (June 2026) — Unified AI Engine & Strict Lazy LLM Controller
+This release consolidates running modes and provides optimized resource controls for the offline LLM model:
+- **Unified Engine Selection**: Updated settings panel dropdown to `"AI MODEL ENGINE"` with options for `gpt-4o (Online)`, `gpt-4o-mini (Online)`, `Phi-3 (Offline GGUF)`, and `Combined (Auto Hybrid)`.
+- **Strict Lazy LLM Loading**: The 2.4GB Phi-3 GGUF backend (`llama-server.exe`) starts up dynamically only when the AI solver tab/window is active on the screen.
+- **Dynamic Settings Updates**: Swapping engine configs while the AI panel is active starts or terminates the local server in real-time.
+- **Bulletproof Memory Reclamation**: Executing native `taskkill` on server stop completely prevents orphan `llama-server.exe` background processes from leaking memory.
+- **Consolidated packaging**: Deleted redundant launcher scripts and specifications, wrapping all logic in a single `main.py` entry point and `FocusFlow.spec`.
 
 ### Version 1.1.0 (June 2026) — Wave 11 Stability & Advanced Features
 This release introduces key engine enhancements, solving personas, and a visual search log history dialog:

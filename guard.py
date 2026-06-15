@@ -162,7 +162,8 @@ class CaptureGuard:
                     )
 
                 # 2. Enumerate ALL top-level windows owned by this process.
-                self._enum_process_windows()
+                # Disabled in WebView2 mode to prevent infinite recursion in AccessibilityObject.Bounds
+                # self._enum_process_windows()
 
                 logger.debug(
                     "[Guard] Capture-exclusion applied to %d window(s)", alive

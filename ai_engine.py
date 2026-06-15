@@ -79,10 +79,15 @@ class AIEngine:
         if self.run_mode == "online":
             self.logger.info("[AIEngine] Online-only mode active: offline engine start bypassed")
             return
-        mode = self.config.get("mode") or "combined"
-        if mode in ("offline", "combined"):
-            self.logger.info("[AIEngine] Starting offline engine")
-            self.offline.start()
+        
+        # Resolve settings model setting
+        model_setting = self.config.get("online_model")
+        if model_setting in ("gpt-4o", "gpt-4o-mini") and self.run_mode != "offline":
+            self.logger.info("[AIEngine] Online model selected: offline engine start bypassed")
+            return
+            
+        self.logger.info("[AIEngine] Starting offline engine")
+        self.offline.start()
 
     def stop(self) -> None:
         """Stop the offline engine process."""
@@ -139,18 +144,17 @@ class AIEngine:
         if self.run_mode in ("online", "offline"):
             return self.run_mode
 
-        mode = self.config.get("mode") or "combined"
-        if mode == "combined":
-            # In combined mode, check which sub-mode is active
-            combined_active = self.config.get("combined_active") or "offline"
-            if combined_active == "online" and self.online.is_ready():
-                return "online"
+        model_setting = self.config.get("online_model")
+        if model_setting == "offline":
+            return "offline"
+        elif model_setting == "combined":
             if self.offline.is_ready():
                 return "offline"
             if self.online.is_ready():
-                self.logger.info("[AIEngine] Combined: offline not ready, using online")
                 return "online"
-            return "offline"  # will fail gracefully with a status message
+            return "offline"  # fallback
+        else: # e.g. gpt-4o, gpt-4o-mini
+            return "online"
         return mode
 
     # ------------------------------------------------------------------

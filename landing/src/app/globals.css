@@ -61,25 +61,21 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
-/* Glassmorphic card styling */
+/* Glassmorphic card styling (adapted for capture-exclusion stability) */
 .glass-panel {
-  background: rgba(8, 8, 12, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(12, 12, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .glass-panel-interactive {
-  background: rgba(8, 8, 12, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(12, 12, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   transition: border-color 0.4s ease, background 0.4s ease;
 }
 
 .glass-panel-interactive:hover {
   border-color: rgba(0, 119, 255, 0.2);
-  background: rgba(10, 10, 18, 0.8);
+  background: rgba(16, 16, 24, 0.98);
 }
 
 /* Text stroke for large editorial headers */

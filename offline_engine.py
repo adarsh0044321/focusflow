@@ -81,6 +81,22 @@ class OfflineEngine:
                     self.logger.error(f"[LLM] Error stopping server: {exc}")
                 finally:
                     self._server_process = None
+            
+            # Windows-specific: ensure all bundled llama-server.exe processes are terminated
+            if sys.platform == "win32":
+                try:
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    subprocess.run(
+                        ["taskkill", "/F", "/IM", "llama-server.exe"],
+                        startupinfo=startupinfo,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    self.logger.info("[LLM] Bulletproof process cleanup executed for llama-server.exe")
+                except Exception as e:
+                    self.logger.debug(f"[LLM] Failed to run taskkill for llama-server.exe: {e}")
+            
             self._set_status("Stopped")
 
     def is_ready(self) -> bool:

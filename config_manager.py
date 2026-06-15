@@ -145,6 +145,11 @@ class ConfigManager:
                 return default
             return DEFAULTS.get(key)
 
+    def get_all(self) -> dict[str, Any]:
+        """Return a copy of the entire settings dictionary."""
+        with self._lock:
+            return dict(self._settings)
+
     def set(self, key: str, value: Any) -> None:
         """Set *key* to *value* and persist immediately."""
         with self._lock:

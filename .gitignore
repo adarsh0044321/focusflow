@@ -48,10 +48,8 @@ env.bak/
 venv.bak/
 
 # FocusFlow specific runtime data
-data/settings.json
-data/settings.json.bak
-data/history.json
-data/history.backup.json
+data/*.json
+data/*.json.bak
 data/screenshots/
 logs/
 temp/
