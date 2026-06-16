@@ -139,11 +139,21 @@ class ConfigManager:
         global default is returned instead.
         """
         with self._lock:
+            val = None
             if key in self._settings:
-                return self._settings[key]
-            if default is not _MISSING:
-                return default
-            return DEFAULTS.get(key)
+                val = self._settings[key]
+            elif default is not _MISSING:
+                val = default
+            else:
+                val = DEFAULTS.get(key)
+
+            # Strict integer casting checks for port/thread parameters
+            if val is not None and key in ("llm_port", "llm_threads", "llm_gpu_layers", "llm_context_length", "opacity"):
+                try:
+                    val = int(val)
+                except (ValueError, TypeError) as e:
+                    logger.warning("Failed to cast %s value %r to int: %s", key, val, e)
+            return val
 
     def get_all(self) -> dict[str, Any]:
         """Return a copy of the entire settings dictionary."""
