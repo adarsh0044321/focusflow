@@ -39,7 +39,12 @@ class SessionManager:
         if self.sessions_path.exists():
             try:
                 with open(self.sessions_path, "r", encoding="utf-8") as f:
-                    self.sessions = json.load(f)
+                    data = json.load(f)
+                if isinstance(data, list):
+                    self.sessions = data
+                else:
+                    logger.warning("Session file does not contain a list. Resetting.")
+                    self.sessions = []
                 logger.info(f"Loaded {len(self.sessions)} focus sessions.")
             except Exception as e:
                 logger.error(f"Error loading sessions: {e}")
@@ -59,7 +64,12 @@ class SessionManager:
         if self.goals_path.exists():
             try:
                 with open(self.goals_path, "r", encoding="utf-8") as f:
-                    self.goals = json.load(f)
+                    data = json.load(f)
+                if isinstance(data, list):
+                    self.goals = data
+                else:
+                    logger.warning("Goals file does not contain a list. Resetting.")
+                    self.goals = []
                 logger.info(f"Loaded {len(self.goals)} daily goals.")
             except Exception as e:
                 logger.error(f"Error loading goals: {e}")
