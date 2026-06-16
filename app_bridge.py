@@ -219,12 +219,16 @@ class FocusFlowAPI:
 
     # --- Settings Manager ---
     def get_settings(self) -> Dict[str, Any]:
-        """Retrieve the configuration settings dict."""
+        """Retrieve the compiled dictionary of application configuration parameters.
+
+        Fetches all persistable setting key-value pairs stored in the active ConfigManager.
+        """
         try:
-            # Return all keys in configuration
-            return self._app.config.get_all()
+            settings_data = self._app.config.get_all()
+            self._logger.debug("Successfully read config settings count: %d", len(settings_data))
+            return settings_data
         except Exception as e:
-            self._logger.error(f"Error reading config: {e}")
+            self._logger.error(f"Error reading config: {e}", exc_info=True)
             return {}
 
     def save_settings(self, settings_dict: Dict[str, Any]) -> bool:
