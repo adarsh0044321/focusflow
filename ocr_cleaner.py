@@ -171,8 +171,11 @@ class OCRCleaner:
             alnum_count = sum(1 for c in non_ws if c.isalnum())
             ratio = alnum_count / len(non_ws)
             
-            # Detect if this is a mathematical expression or formatted numbers
-            has_math_op = any(c in non_ws for c in "+-*/=^√∫∂∆%±≤≥≠≈∝")
+            # Detect if this is a mathematical expression or formatted numbers.
+            # Whitelist standard math operators, Greek letters, parentheses, and brackets
+            # to preserve algebraic formulas from being discarded as garbage lines.
+            math_characters = "+-*/=^√∫∂∆%±≤≥≠≈∝()[]{}<>"
+            has_math_op = any(c in non_ws for c in math_characters)
             has_digits = any(c.isdigit() for c in non_ws)
             is_math_or_numeric = (has_math_op and alnum_count >= 2) or (has_digits and alnum_count >= 3)
             
