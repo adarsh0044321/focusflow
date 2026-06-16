@@ -317,7 +317,7 @@ class AIEngine:
                         answer = self.offline.query(question_text, system_prompt, knowledge_ctx)
                         engine = "offline/llamacpp"
             except Exception as exc:
-                self.logger.error(f"[AIEngine] Manual solve error: {exc}")
+                self.logger.error(f"[AIEngine] Manual query solve failed on engine '{mode}': {exc}", exc_info=True)
                 answer = f"[Error] {exc}"
                 engine = mode
 
