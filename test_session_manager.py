@@ -170,5 +170,17 @@ class TestSessionManager(unittest.TestCase):
         achievements = self.session_mgr.check_achievements()
         self.assertIn("deep_diver", achievements)
 
+    def test_session_boundary_values(self) -> None:
+        # Verify 0 target duration is handled gracefully without ZeroDivisionError
+        session = self.session_mgr.add_session(
+            goal="Zero Target Duration",
+            subject="History",
+            duration_mins=10,
+            target_duration_mins=0,
+            mode="light",
+            status="completed"
+        )
+        self.assertEqual(session["focus_score"], 100)
+
 if __name__ == "__main__":
     unittest.main()
