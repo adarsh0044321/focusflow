@@ -25,12 +25,16 @@ import http.server
 import socketserver
 
 # --- Initialize DPI awareness on Windows ---
+# DPI (Dots Per Inch) awareness is configured on Windows to prevent the Webview2
+# frame and overlay graphics from being blurry or incorrectly scaled on high-DPI monitors.
 if sys.platform == "win32":
     try:
         import ctypes
+        # SetProcessDpiAwareness(1) corresponds to PROCESS_SYSTEM_DPI_AWARE
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except Exception:
         try:
+            # Fallback to SetProcessDPIAware for older Windows OS versions
             ctypes.windll.user32.SetProcessDPIAware()
         except Exception:
             pass
