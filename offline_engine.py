@@ -68,15 +68,16 @@ class OfflineEngine:
             self._ready_event.clear()
             if self._server_process is not None:
                 try:
-                    self.logger.info("[LLM] Terminating server process...")
+                    pid = self._server_process.pid
+                    self.logger.info(f"[LLM] Terminating server process (PID: {pid})...")
                     self._server_process.terminate()
                     try:
                         self._server_process.wait(timeout=3)
-                        self.logger.info("[LLM] Server process terminated")
+                        self.logger.info(f"[LLM] Server process terminated (PID: {pid})")
                     except subprocess.TimeoutExpired:
                         self._server_process.kill()
                         self._server_process.wait(timeout=2)
-                        self.logger.warning("[LLM] Server process killed after timeout")
+                        self.logger.warning(f"[LLM] Server process (PID: {pid}) killed after timeout")
                 except Exception as exc:
                     self.logger.error(f"[LLM] Error stopping server: {exc}")
                 finally:
