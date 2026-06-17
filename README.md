@@ -200,4 +200,5 @@ This release introduces key engine enhancements, solving personas, and a visual 
 ---
 
 ## 📄 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for the full license terms.
