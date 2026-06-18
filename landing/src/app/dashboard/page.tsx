@@ -1015,36 +1015,36 @@ export default function DashboardPage() {
                   </button>
 
                 <div className="flex flex-col items-center space-y-2">
-                  {sessionMode === "very_strict" ? (
-                    timeLeft <= 0 && (
-                      <button
-                        onClick={handleStopSession}
-                        className="px-6 py-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/10 hover:bg-emerald-950/30 text-xs text-emerald-400 font-bold transition-all active:scale-95 flex items-center space-x-1.5 shadow-lg shadow-emerald-500/5"
-                      >
-                        <Check className="w-4 h-4" />
-                        <span>Finish Session & Log Stats</span>
-                      </button>
-                    )
+                  {timeLeft <= 0 ? (
+                    <button
+                      onClick={handleStopSession}
+                      className="px-6 py-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/10 hover:bg-emerald-950/30 text-xs text-emerald-400 font-bold transition-all active:scale-95 flex items-center space-x-1.5 shadow-lg shadow-emerald-500/5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Finish Session & Log Stats</span>
+                    </button>
                   ) : (
-                    <>
-                      <button
-                        onMouseDown={handleExitMouseDown}
-                        onMouseUp={handleExitMouseUp}
-                        onMouseLeave={handleExitMouseUp}
-                        onTouchStart={handleExitMouseDown}
-                        onTouchEnd={handleExitMouseUp}
-                        className="px-6 py-2.5 rounded-lg border border-red-500/20 bg-red-950/5 text-xs text-[#ef4444] font-semibold relative overflow-hidden transition-all hover:bg-red-950/20 active:scale-95"
-                      >
-                        <div className="absolute top-0 bottom-0 left-0 bg-red-500/10 transition-all" style={{ width: `${exitHoldProgress}%` }}></div>
-                        <span className="relative z-10 flex items-center space-x-1">
-                          <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                          <span>{sessionMode === "light" ? "Exit Session" : "Hold Click to Emergency Exit (10s)"}</span>
-                        </span>
-                      </button>
-                      {showExitWarning && sessionMode !== "light" && (
-                        <span className="text-[10px] text-red-400 font-mono animate-pulse">Emergency exit will mark your session interrupted and penalize score!</span>
-                      )}
-                    </>
+                    sessionMode !== "very_strict" && (
+                      <>
+                        <button
+                          onMouseDown={handleExitMouseDown}
+                          onMouseUp={handleExitMouseUp}
+                          onMouseLeave={handleExitMouseUp}
+                          onTouchStart={handleExitMouseDown}
+                          onTouchEnd={handleExitMouseUp}
+                          className="px-6 py-2.5 rounded-lg border border-red-500/20 bg-red-950/5 text-xs text-[#ef4444] font-semibold relative overflow-hidden transition-all hover:bg-red-950/20 active:scale-95"
+                        >
+                          <div className="absolute top-0 bottom-0 left-0 bg-red-500/10 transition-all" style={{ width: `${exitHoldProgress}%` }}></div>
+                          <span className="relative z-10 flex items-center space-x-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                            <span>{sessionMode === "light" ? "Exit Session" : "Hold Click to Emergency Exit (10s)"}</span>
+                          </span>
+                        </button>
+                        {showExitWarning && sessionMode !== "light" && (
+                          <span className="text-[10px] text-red-400 font-mono animate-pulse">Emergency exit will mark your session interrupted and penalize score!</span>
+                        )}
+                      </>
+                    )
                   )}
                 </div>
               </div>
@@ -1769,22 +1769,36 @@ export default function DashboardPage() {
 
               {/* Danger Zone: Emergency Exit Button */}
               <div className="flex flex-col items-center space-y-2">
-                <button
-                  onMouseDown={handleExitMouseDown}
-                  onMouseUp={handleExitMouseUp}
-                  onMouseLeave={handleExitMouseUp}
-                  onTouchStart={handleExitMouseDown}
-                  onTouchEnd={handleExitMouseUp}
-                  className="px-6 py-2.5 rounded-lg border border-red-500/20 bg-red-950/5 text-xs text-red-500 font-semibold relative overflow-hidden transition-all hover:bg-red-950/20 active:scale-95"
-                >
-                  <div className="absolute top-0 bottom-0 left-0 bg-red-500/10 transition-all" style={{ width: `${exitHoldProgress}%` }}></div>
-                  <span className="relative z-10 flex items-center space-x-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                    <span>{sessionMode === "light" ? "Exit Session" : "Hold Click to Emergency Exit (10s)"}</span>
-                  </span>
-                </button>
-                {showExitWarning && sessionMode !== "light" && (
-                  <span className="text-[10px] text-red-400 font-mono animate-pulse">Emergency exit will mark your session interrupted and penalize score!</span>
+                {timeLeft <= 0 ? (
+                  <button
+                    onClick={handleStopSession}
+                    className="px-6 py-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/10 hover:bg-emerald-950/30 text-xs text-emerald-400 font-bold transition-all active:scale-95 flex items-center space-x-1.5 shadow-lg shadow-emerald-500/5"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Finish Session & Log Stats</span>
+                  </button>
+                ) : (
+                  sessionMode !== "very_strict" && (
+                    <>
+                      <button
+                        onMouseDown={handleExitMouseDown}
+                        onMouseUp={handleExitMouseUp}
+                        onMouseLeave={handleExitMouseUp}
+                        onTouchStart={handleExitMouseDown}
+                        onTouchEnd={handleExitMouseUp}
+                        className="px-6 py-2.5 rounded-lg border border-red-500/20 bg-red-950/5 text-xs text-red-500 font-semibold relative overflow-hidden transition-all hover:bg-red-950/20 active:scale-95"
+                      >
+                        <div className="absolute top-0 bottom-0 left-0 bg-red-500/10 transition-all" style={{ width: `${exitHoldProgress}%` }}></div>
+                        <span className="relative z-10 flex items-center space-x-1">
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                          <span>{sessionMode === "light" ? "Exit Session" : "Hold Click to Emergency Exit (10s)"}</span>
+                        </span>
+                      </button>
+                      {showExitWarning && sessionMode !== "light" && (
+                        <span className="text-[10px] text-red-400 font-mono animate-pulse">Emergency exit will mark your session interrupted and penalize score!</span>
+                      )}
+                    </>
+                  )
                 )}
               </div>
             </div>
