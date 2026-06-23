@@ -6,7 +6,7 @@ import {
   Zap, Monitor, Clock, Target, Shield, Sparkles, BookOpen, Flame,
   Play, Pause, SkipForward, ChevronRight, Settings, BarChart2,
   HelpCircle, CheckSquare, Plus, Trash2, Volume2, Music, Check,
-  AlertTriangle, LogOut, FileText, Folder, Eye, Moon, Compass
+  AlertTriangle, LogOut, FileText, Folder, Eye, Moon, Compass, Code, Terminal
 } from "lucide-react";
 
 // --- Types & Schema Definitions ---
@@ -112,6 +112,13 @@ export default function DashboardPage() {
     fullscreen: false,
     capture_protection: true,
   });
+
+  // --- Coding Sandbox States ---
+  const [enableCodingSandbox, setEnableCodingSandbox] = useState<boolean>(false);
+  const [sandboxCode, setSandboxCode] = useState<string>("# Write your Python code here\nprint('Hello FocusFlow!')\n");
+  const [sandboxLang, setSandboxLang] = useState<string>("python");
+  const [sandboxOutput, setSandboxOutput] = useState<string>("Console ready...\n");
+  const [sandboxRunning, setSandboxRunning] = useState<boolean>(false);
 
   const isFeatureLocked = (featureId: string) => {
     if (sessionMode === "very_strict") return true;
@@ -383,6 +390,9 @@ export default function DashboardPage() {
         setSessionSubject(activeSession.subject);
         setSessionMode(activeSession.mode);
         setSessionDuration(activeSession.target_duration_mins);
+        if (activeSession.custom_features?.coding_sandbox) {
+          setEnableCodingSandbox(true);
+        }
         
         // Calculate remaining seconds
         const start = new Date(activeSession.start_time).getTime();
@@ -452,10 +462,91 @@ export default function DashboardPage() {
     
     if (isWebviewReady) {
       const api = (window as any).pywebview.api;
-      await api.start_focus_session(sessionGoal, sessionSubject, sessionDuration, sessionMode, customFeatures);
+      const featuresToSend = {
+        ...customFeatures,
+        coding_sandbox: enableCodingSandbox
+      };
+      await api.start_focus_session(sessionGoal, sessionSubject, sessionDuration, sessionMode, featuresToSend);
     }
     
     startTimer();
+  };
+
+  const handleLangChange = (lang: string) => {
+    setSandboxLang(lang);
+    if (lang === "python") {
+      setSandboxCode("# Write your Python code here\nprint('Hello FocusFlow!')\n");
+    } else if (lang === "javascript") {
+      setSandboxCode("// Write your JavaScript code here\nconsole.log('Hello FocusFlow!');\n");
+    } else if (lang === "html") {
+      setSandboxCode("<!-- Write your HTML/CSS code here -->\n<h1>Hello FocusFlow!</h1>\n<p>HTML preview will be rendered below.</p>\n");
+    }
+  };
+
+  const handleSaveScript = () => {
+    try {
+      const ext = sandboxLang === "python" ? "py" : sandboxLang === "javascript" ? "js" : "html";
+      const blob = new Blob([sandboxCode], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `workspace.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast(`Saved script successfully!`, "success");
+    } catch (e) {
+      showToast(`Failed to save script: ${e.message}`, "error");
+    }
+  };
+
+  const handleRunSandboxCode = async () => {
+    setSandboxRunning(true);
+    setSandboxOutput("Executing code...\n");
+
+    if (sandboxLang === "javascript") {
+      let output = "";
+      const originalLog = console.log;
+      console.log = (...args) => {
+        output += args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(" ") + "\n";
+      };
+      
+      try {
+        const fn = new Function(sandboxCode);
+        fn();
+        setSandboxOutput(output || "Code executed successfully with no output.\n");
+      } catch (err) {
+        setSandboxOutput(output + `Execution Error: ${err.message}\n`);
+      } finally {
+        console.log = originalLog;
+        setSandboxRunning(false);
+      }
+    } else if (sandboxLang === "python") {
+      try {
+        if (typeof window !== "undefined" && (window as any).pywebview?.api?.run_code) {
+          const api = (window as any).pywebview.api;
+          const res = await api.run_code("python", sandboxCode);
+          if (res.exit_code === 0) {
+            setSandboxOutput(res.stdout || "Code executed successfully with no output.\n");
+          } else {
+            let out = "";
+            if (res.stdout) out += res.stdout;
+            if (res.stderr) out += (out ? "\n" : "") + `Error:\n${res.stderr}`;
+            setSandboxOutput(out || "Execution failed with non-zero exit code.\n");
+          }
+        } else {
+          setSandboxOutput("Python execution not available: WebView API bridge missing.\n");
+        }
+      } catch (err) {
+        setSandboxOutput(`Execution failed: ${err.message}\n`);
+      } finally {
+        setSandboxRunning(false);
+      }
+    } else if (sandboxLang === "html") {
+      setSandboxOutput("HTML Preview loaded.\n");
+      setSandboxRunning(false);
+    }
   };
 
   const startTimer = () => {
@@ -728,8 +819,8 @@ export default function DashboardPage() {
   if (sessionActive) {
     return (
       <div className="flex h-screen w-screen bg-black text-[#f5f5f7] overflow-hidden select-none font-sans antialiased">
-        {/* Immersive Focus Sidebar - Hidden in Very Strict Mode */}
-        {sessionMode !== "very_strict" && (
+        {/* Immersive Focus Sidebar - Hidden in Very Strict Mode (Unless Coding Sandbox is enabled) */}
+        {(sessionMode !== "very_strict" || enableCodingSandbox) && (
           <div className="w-16 bg-[#0f0f15] border-r border-zinc-900/60 flex flex-col justify-between items-center py-6 z-20">
             <div className="space-y-6 flex flex-col items-center w-full">
               {/* Minimal Logo indicator */}
@@ -750,39 +841,58 @@ export default function DashboardPage() {
                 >
                   <Clock className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={() => setSessionTab("ai")}
-                  className={`p-2 rounded-lg transition-colors ${
-                    sessionTab === "ai"
-                      ? "bg-zinc-900 text-white border border-zinc-800"
-                      : "text-zinc-500 hover:text-zinc-300"
-                  }`}
-                  title="Study AI Assistant"
-                >
-                  <Sparkles className="w-5 h-5" />
-                </button>
-                 <button
-                  onClick={() => setSessionTab("tools")}
-                  className={`p-2 rounded-lg transition-colors ${
-                    sessionTab === "tools"
-                      ? "bg-zinc-900 text-white border border-zinc-800"
-                      : "text-zinc-500 hover:text-zinc-300"
-                  }`}
-                  title="Student Tools"
-                >
-                  <BookOpen className="w-5 h-5" />
-                </button>
-                {pdfUrl && (
+                
+                {sessionMode !== "very_strict" && (
+                  <>
+                    <button
+                      onClick={() => setSessionTab("ai")}
+                      className={`p-2 rounded-lg transition-colors ${
+                        sessionTab === "ai"
+                          ? "bg-zinc-900 text-white border border-zinc-800"
+                          : "text-zinc-500 hover:text-zinc-300"
+                      }`}
+                      title="Study AI Assistant"
+                    >
+                      <Sparkles className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setSessionTab("tools")}
+                      className={`p-2 rounded-lg transition-colors ${
+                        sessionTab === "tools"
+                          ? "bg-zinc-900 text-white border border-zinc-800"
+                          : "text-zinc-500 hover:text-zinc-300"
+                      }`}
+                      title="Student Tools"
+                    >
+                      <BookOpen className="w-5 h-5" />
+                    </button>
+                    {pdfUrl && (
+                      <button
+                        onClick={() => setSessionTab("pdf")}
+                        className={`p-2 rounded-lg transition-colors ${
+                          sessionTab === "pdf"
+                            ? "bg-zinc-900 text-white border border-zinc-800"
+                            : "text-zinc-500 hover:text-zinc-300"
+                        }`}
+                        title="Active Study PDF"
+                      >
+                        <FileText className="w-5 h-5" />
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {enableCodingSandbox && (
                   <button
-                    onClick={() => setSessionTab("pdf")}
+                    onClick={() => setSessionTab("sandbox")}
                     className={`p-2 rounded-lg transition-colors ${
-                      sessionTab === "pdf"
+                      sessionTab === "sandbox"
                         ? "bg-zinc-900 text-white border border-zinc-800"
                         : "text-zinc-500 hover:text-zinc-300"
                     }`}
-                    title="Active Study PDF"
+                    title="Coding Sandbox"
                   >
-                    <FileText className="w-5 h-5" />
+                    <Code className="w-5 h-5" />
                   </button>
                 )}
               </div>
@@ -790,7 +900,9 @@ export default function DashboardPage() {
             
             {/* Bottom indicator */}
             <div className="flex flex-col items-center space-y-3">
-              <span className="capitalize px-1.5 py-0.5 rounded bg-zinc-950 font-mono text-[8px] text-zinc-450 border border-zinc-900">{sessionMode.replace("_", " ")}</span>
+              <span className="capitalize px-1.5 py-0.5 rounded bg-zinc-950 font-mono text-[8px] text-zinc-450 border border-zinc-900">
+                {sessionMode === "very_strict" ? "Very Strict (Code)" : sessionMode.replace("_", " ")}
+              </span>
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
             </div>
           </div>
@@ -1207,6 +1319,130 @@ export default function DashboardPage() {
                </div>
              </div>
            )}
+
+           {/* Tab 5: Coding Sandbox */}
+           {sessionTab === "sandbox" && (
+             <div className="flex-1 p-6 overflow-hidden max-w-6xl w-full mx-auto h-[80vh] flex flex-col space-y-4">
+               <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden">
+                 
+                 {/* Left Column: Code Editor */}
+                 <div className="glass-panel p-4 rounded-xl border border-zinc-900 flex flex-col overflow-hidden border-zinc-800 bg-[#07070b]/60">
+                   <div className="flex items-center justify-between pb-3 border-b border-zinc-900 mb-3">
+                     <div className="flex items-center space-x-2">
+                       <Code className="w-4 h-4 text-blue-500 animate-pulse" />
+                       <span className="text-xs font-bold font-mono text-zinc-300">workspace.{(sandboxLang === "python" ? "py" : sandboxLang === "javascript" ? "js" : "html")}</span>
+                     </div>
+                     <div className="flex items-center space-x-1.5 bg-zinc-950 p-1 rounded border border-zinc-900">
+                       {[
+                         { id: "python", label: "Python 3" },
+                         { id: "javascript", label: "JavaScript" },
+                         { id: "html", label: "HTML/CSS" }
+                       ].map((lang) => (
+                         <button
+                           key={lang.id}
+                           onClick={() => handleLangChange(lang.id)}
+                           className={`px-2 py-1 rounded text-[10px] font-semibold transition-all ${
+                             sandboxLang === lang.id
+                               ? "bg-zinc-850 text-white font-bold"
+                               : "text-zinc-500 hover:text-zinc-300"
+                           }`}
+                         >
+                           {lang.label}
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+                   
+                   <div className="flex-1 flex overflow-hidden relative rounded-lg border border-zinc-950 bg-black/40">
+                     {/* Simulated Line Numbers */}
+                     <div className="w-10 bg-zinc-950/80 border-r border-zinc-900 py-3 flex flex-col items-center select-none text-[10px] font-mono text-zinc-600 leading-relaxed">
+                       {Array.from({ length: Math.max(15, sandboxCode.split("\n").length) }).map((_, i) => (
+                         <div key={i} className="h-5 flex items-center justify-end pr-1.5 w-full">{i + 1}</div>
+                       ))}
+                     </div>
+                     {/* Editor Textarea */}
+                     <textarea
+                       value={sandboxCode}
+                       onChange={(e) => setSandboxCode(e.target.value)}
+                       spellCheck={false}
+                       autoCapitalize="none"
+                       autoComplete="off"
+                       autoCorrect="off"
+                       className="flex-1 p-3 bg-transparent text-xs font-mono text-zinc-200 focus:outline-none resize-none leading-relaxed overflow-y-auto whitespace-pre tab-size-4"
+                       style={{ tabSize: 4 }}
+                     />
+                   </div>
+                 </div>
+
+                 {/* Right Column: Execution Output */}
+                 <div className="glass-panel p-4 rounded-xl border border-zinc-900 flex flex-col overflow-hidden border-zinc-800 bg-[#07070b]/60">
+                   <div className="flex items-center justify-between pb-3 border-b border-zinc-900 mb-3">
+                     <div className="flex items-center space-x-2">
+                       <Terminal className="w-4 h-4 text-emerald-500" />
+                       <span className="text-xs font-bold font-mono text-zinc-300">execution_terminal</span>
+                     </div>
+                     <div className="flex items-center space-x-2">
+                       <button
+                         onClick={handleSaveScript}
+                         className="px-2.5 py-1.5 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 text-[10px] text-zinc-400 hover:text-white flex items-center space-x-1"
+                         title="Save script to file"
+                       >
+                         <span>Save Script</span>
+                       </button>
+                       <button
+                         onClick={() => setSandboxOutput("Console ready...\n")}
+                         className="px-2.5 py-1.5 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 text-[10px] text-zinc-500 hover:text-zinc-300"
+                       >
+                         Clear
+                       </button>
+                       <button
+                         onClick={handleRunSandboxCode}
+                         disabled={sandboxRunning}
+                         className={`px-3 py-1.5 rounded text-[10px] font-bold text-white flex items-center space-x-1.5 ${
+                           sandboxRunning 
+                             ? "bg-blue-850 cursor-not-allowed opacity-50" 
+                             : "bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-500/10 active:scale-95"
+                         }`}
+                       >
+                         {sandboxRunning ? (
+                           <>
+                             <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                             <span>Running...</span>
+                           </>
+                         ) : (
+                           <>
+                             <span>Run Code</span>
+                           </>
+                         )}
+                       </button>
+                     </div>
+                   </div>
+
+                   {/* Output Console / Preview */}
+                   <div className="flex-1 flex flex-col space-y-3 overflow-hidden">
+                     {sandboxLang === "html" ? (
+                       <div className="flex-1 flex flex-col space-y-2 overflow-hidden">
+                         <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Live HTML Render View</span>
+                         <div className="flex-1 bg-white rounded-lg overflow-hidden border border-zinc-900">
+                           <iframe
+                             srcDoc={sandboxCode}
+                             className="w-full h-full bg-white"
+                             sandbox="allow-scripts"
+                             title="HTML Live Sandbox Preview"
+                           />
+                         </div>
+                       </div>
+                     ) : (
+                       <div className="flex-1 bg-black p-4 rounded-lg border border-zinc-950 font-mono text-xs text-emerald-450 overflow-y-auto whitespace-pre-wrap select-text leading-relaxed scrollbar-thin">
+                         {sandboxOutput}
+                       </div>
+                     )}
+                   </div>
+                 </div>
+
+               </div>
+             </div>
+           )}
          </div>
        </div>
     );
@@ -1464,6 +1700,31 @@ export default function DashboardPage() {
                     />
                   </div>
                 </div>
+
+                {/* Computer Science Coding Option */}
+                {sessionSubject === "Computer Science" && (sessionMode === "strict" || sessionMode === "very_strict") && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-lg bg-zinc-950 border border-zinc-900 flex items-start space-x-3 transition-all"
+                  >
+                    <input
+                      type="checkbox"
+                      id="enable_coding_sandbox"
+                      checked={enableCodingSandbox}
+                      onChange={(e) => setEnableCodingSandbox(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-zinc-800 bg-zinc-950 text-blue-600 focus:ring-blue-600 focus:ring-offset-zinc-950 focus:ring-1 cursor-pointer"
+                    />
+                    <div className="flex flex-col">
+                      <label htmlFor="enable_coding_sandbox" className="text-xs font-semibold text-white cursor-pointer">
+                        Enable Built-in Coding Sandbox?
+                      </label>
+                      <p className="text-zinc-550 text-[10px] mt-0.5 leading-relaxed">
+                        Since you are in {sessionMode === "strict" ? "Strict" : "Very Strict"} mode studying Computer Science, checking this will add a secure interactive IDE tab to write, compile, and run code within FocusFlow without opening any blocked external software.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Duration & Mode */}
                 <div className="grid grid-cols-3 gap-4">

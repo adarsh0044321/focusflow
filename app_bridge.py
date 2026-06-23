@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import subprocess
+import sys
 import threading
 import time
 import win32api
@@ -286,3 +287,66 @@ class FocusFlowAPI:
                 threading.Thread(target=self._app.ai.stop, daemon=True).start()
         except Exception as e:
             self._logger.error(f"Error handling AI panel visibility change: {e}")
+
+    # --- Coding Sandbox Executor ---
+    def run_code(self, language: str, code: str) -> Dict[str, Any]:
+        """Run code inside a safe sandbox subprocess."""
+        try:
+            self._logger.info(f"Coding sandbox request: {language}")
+            if language.lower() == "python":
+                # Create a temp directory inside the application root
+                temp_dir = Path(self._app.recovery_path).parent / "temp"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"sandbox_{int(time.time())}.py"
+                
+                with open(temp_file, "w", encoding="utf-8") as f:
+                    f.write(code)
+                
+                try:
+                    # Run code with a strict timeout of 5 seconds to prevent hangs/loops
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    result = subprocess.run(
+                        [sys.executable, str(temp_file)],
+                        capture_output=True,
+                        text=True,
+                        timeout=5.0,
+                        startupinfo=startupinfo
+                    )
+                    stdout = result.stdout
+                    stderr = result.stderr
+                    exit_code = result.returncode
+                except subprocess.TimeoutExpired:
+                    stdout = ""
+                    stderr = "Execution Timeout: The code took longer than 5 seconds to run."
+                    exit_code = -1
+                except Exception as ex:
+                    stdout = ""
+                    stderr = f"Execution Error: {ex}"
+                    exit_code = -1
+                finally:
+                    if temp_file.exists():
+                        try:
+                            temp_file.unlink()
+                        except Exception:
+                            pass
+                
+                return {
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "exit_code": exit_code
+                }
+            else:
+                return {
+                    "stdout": "",
+                    "stderr": f"Unsupported sandbox language: {language}",
+                    "exit_code": -1
+                }
+        except Exception as e:
+            self._logger.error(f"Error running code: {e}")
+            return {
+                "stdout": "",
+                "stderr": f"Backend Error: {e}",
+                "exit_code": -1
+            }
+

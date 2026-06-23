@@ -648,13 +648,19 @@ class FocusFlowApp:
                             # 1. Very Strict Mode
                             if self.session_mode == "very_strict":
                                 is_allowed = False
+                                if self.session_subject == "Computer Science" and self.session_features.get("coding_sandbox"):
+                                    allowed_apps = ["code.exe", "python.exe", "pythonw.exe", "idle.exe", "notepad.exe", "notepad++.exe"]
+                                    if proc_name and proc_name.lower() in [app.lower() for app in allowed_apps]:
+                                        is_allowed = True
 
                             # 2. Strict Mode
                             elif self.session_mode == "strict":
                                 allowed_apps = self.config.get("strict_allowed_apps") or [
                                     "Spotify.exe", "Acrobat.exe", "SumatraPDF.exe", "explorer.exe"
                                 ]
-                                if proc_name in allowed_apps:
+                                if self.session_subject == "Computer Science" and self.session_features.get("coding_sandbox"):
+                                    allowed_apps = allowed_apps + ["code.exe", "python.exe", "pythonw.exe", "idle.exe", "notepad.exe", "notepad++.exe"]
+                                if proc_name and proc_name.lower() in [app.lower() for app in allowed_apps]:
                                     is_allowed = True
 
                             # 3. Moderate / Custom / Light with foreground guard
@@ -736,8 +742,12 @@ class FocusFlowApp:
             allowed_apps = self.config.get("strict_allowed_apps") or [
                 "Spotify.exe", "Acrobat.exe", "SumatraPDF.exe", "explorer.exe"
             ]
+            if self.session_subject == "Computer Science" and self.session_features.get("coding_sandbox"):
+                allowed_apps = allowed_apps + ["code.exe", "python.exe", "pythonw.exe", "idle.exe", "notepad.exe", "notepad++.exe"]
         elif self.session_mode == "very_strict":
             allowed_apps = ["explorer.exe"]
+            if self.session_subject == "Computer Science" and self.session_features.get("coding_sandbox"):
+                allowed_apps = allowed_apps + ["code.exe", "python.exe", "pythonw.exe", "idle.exe", "notepad.exe", "notepad++.exe"]
         else: # Moderate/custom
             allowed_apps = self.config.get("moderate_allowed_apps") or [
                 "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "Spotify.exe"
