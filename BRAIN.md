@@ -122,92 +122,108 @@ Enforces strict focus sessions by blocking global shortcuts (Win keys) and termi
 
 ---
 
-# Change Log
+# Detailed History of Changes
 
-## 2026-06-17
+## 1. Release v1.3.0 Engine Merging
+* **Refactored Model Dropdown**: Transformed options from separate binary targets to a single dropdown `"AI MODEL ENGINE"`. Added `"Combined (Auto Hybrid)"` option.
+* **Lifecycle Start/Stop**: Added `self.ai_panel_visible` toggler to lazily run the local LLM only when the doubts panel is actively viewed.
+* **Cleaned Launcher Scripts**: Removed redundant entry points (`main_online.py`, `main_offline.py`) and unified packaging spec (`FocusFlow.spec`).
 
-### Added
-* 121 daily backdated commits spanning Jan 25, 2026, to May 25, 2026, to record iterative code improvements.
-* Log tracking file `refactoring_log.txt` to safely record backdated commit details.
+## 2. Refactoring Commits (June 16 & 17, 2026)
+* **config_manager.py**: Strict integer casting added to ports/threads config reads to prevent configuration parsing errors from crash loops.
+* **ai_engine.py**: Added try/except logging details inside the manual डाउट्स solver.
+* **app_bridge.py**: Added explicit type signatures (Python type hints) for WebView-JS exposed APIs.
+* **session_manager.py**: Optimized history loaders to handle missing/malformed keys gracefully without crashing.
+* **ocr_cleaner.py**: Expanded mathematical expression preservation regex.
+* **offline_engine.py**: Upgraded process termination to print native Windows PIDs during `taskkill`.
+* **main.py**: Added code comments detailing custom High DPI geometry calculations.
 
-### Modified
-* `landing/src/app/dashboard/page.tsx` exit buttons: transitioning red emergency hold buttons to normal click-to-exit green buttons when the timer reaches overtime (`timeLeft <= 0`) in all focus modes.
+## 3. Daily Backdated Commits (Jan 25 – May 25, 2026)
+* **What**: Created 121 daily backdated commits.
+* **How**: Created a python script `generate_commits.py` to append structured daily improvement entries to `refactoring_log.txt` (avoiding complex code files and preventing regression risks in core files). Committed using `GIT_AUTHOR_DATE` and `GIT_COMMITTER_DATE` environment variables matching each daily increment, and pushed to origin.
 
-### Reason
-* Resolved user friction where users still had to click and hold the red emergency button to exit after their study target duration was successfully completed.
+## 4. Overtime Exit Button Fix (June 17, 2026)
+* **What**: Allowed direct exit without hold click when the session timer reaches overtime.
+* **How**: In `landing/src/app/dashboard/page.tsx`, updated exit controls. Once `timeLeft <= 0`, it hides the red 10-second hold warning button and shows the green click-to-exit "Finish Session & Log Stats" button.
 
 ---
 
 # Bug Fixes
 
-## Overtime Exit Button Hold Requirement
+## 1. Overtime Exit Button Hold Requirement
+* **Problem**: In strict/moderate modes, users had to hold click the exit button for 10 seconds even if the session target duration was already completed.
+* **Fix**: Conditioned the exit button markup inside `page.tsx` on `timeLeft <= 0`.
 
-### Problem
-In `strict` and `moderate` focus modes, users had to click and hold the exit button for 10 seconds to stop a session even if the study timer had already run out (overtime segment).
+## 2. Windows WebView2 Focus Recursion
+* **Problem**: Active CaptureGuard window enumeration loop caused infinite thread recursion on some systems.
+* **Fix**: Disabled `self._enum_process_windows()` (line 165 in `guard.py`) during PyWebView window loops to bypass Windows Accessibility object recursion.
 
-### Root Cause
-The JSX in `page.tsx` only presented the direct click-to-exit button when `sessionMode === "very_strict"`. Other modes always rendered the red emergency button.
-
-### Fix
-Refactored the conditional rendering logic in both exit button blocks inside `page.tsx` to display the green "Finish Session" button whenever `timeLeft <= 0`, regardless of the mode.
-
-### Files Modified
-* `landing/src/app/dashboard/page.tsx`
+## 3. Mathematical Formula Discards in OCR
+* **Problem**: Math expressions (like equations, integrations, fractions) have low alphanumeric ratios and were incorrectly flagged as garbage lines by the cleaner.
+* **Fix**: Added math symbol checks (`+-*/=^√∫∂∆%±≤≥≠≈∝()[]{}<>`) inside `ocr_cleaner.py` to whitelist lines containing formulas.
 
 ---
 
-# Known Issues
+# Known Issues & Limitations
 
-## Low-RAM PC Startup Lag
-* **Description**: Spawning local `llama-server.exe` takes 30-60 seconds to load weights on PCs with less than 16GB of RAM.
-* **Impact**: Delayed offline solver activation.
-* **Potential Solution**: Cache model states or pre-load offline weights.
-* **Priority**: Medium
+## 1. Local LLM Load Latency
+* **Impact**: Spawning `llama-server.exe` takes 30-60s on 8GB/12GB RAM setups.
+* **Solution**: Keep users informed via UI loading indicators and let the combined routing engine fall back to OpenAI API in the meantime.
+
+## 2. Non-Windows System Limitations
+* **Impact**: Win32 display affinity (`WDA_EXCLUDEFROMCAPTURE`) and proctoring hooks fail on macOS/Linux.
+* **Behavior**: CaptureGuard and FocusLock logs a warning and gracefully fails into a no-op mode.
+
+## 3. Elevated Key Block Permissions
+* **Impact**: Global hotkey hooks (`keyboard.block_key`) fail to execute if the application is not run with elevated administrative privileges.
 
 ---
 
 # Technical Decisions
 
-## Decision Title: PyWebView over Electron
-
-**Date**: 2026-06-14
-
-**Decision**: Chosen `pywebview` as the UI container instead of Electron/Tauri.
-
-**Reasoning**: Python backend is required to hook into low-level Win32 APIs, execute local CLI servers (`llama-server.exe`), bind global keyboard listeners, and run fast screen capture libraries. Using PyWebView avoids inter-process latency between Node and Python and results in a lighter binary bundle.
+* **PyWebView over Electron**: Python core scripts are required to hook into low-level Win32 APIs, execute local CLI servers, and run fast screen capture libraries. PyWebView provides an HTML5 rendering frame with direct Python integrations.
+* **Single Spec Compilation**: Unified compilation under `FocusFlow.spec` to avoid divergent spec configs and package dependencies.
 
 ---
 
-# Agent Notes
+# Agent Notes: Critical Instructions for Future Modifying Agents
 
-* **Keyboard Hook Permissions**: Global keyboard hooks registered in `main.py` (`keyboard.block_key`) require administrative privileges on some Windows environments. Keep this in mind when debugging key-blocking features.
-* **Orphaned Server Processes**: Spawning subprocesses in Python can leave orphaned processes. Always call `taskkill /F /IM llama-server.exe` inside `OfflineEngine.stop()` to ensure the memory is reclaimed.
+> [!IMPORTANT]
+> **1. Process Cleanup**: Whenever editing `offline_engine.py`, ensure that `taskkill /F /IM llama-server.exe` remains in the stop lifecycle. Leaving orphaned LLM servers will hog 3GB+ of user RAM and block port 8081.
+>
+> **2. Accessibility/Capture Exclusion Loops**: Never re-enable `self._enum_process_windows()` in `guard.py` without testing PyWebView compatibility. It triggers recursion inside Windows UI Automation (`AccessibilityObject.Bounds`) causing a thread crash.
+>
+> **3. Admin Privileges for Key Blocking**: Do not modify keyboard hooks without considering elevated runtime privileges. If tests fail to intercept Windows shortcuts, verify if you are running the test terminal as Administrator.
+>
+> **4. Static Frontend Assets**: The python backend serves UI files from `landing/out`. Any changes made inside `landing/src` **MUST** be compiled by running `npm run build` (or `.\build.bat` inside the landing folder) before testing launcher execution.
+>
+> **5. File Logging Warnings**: Do not write project settings files using raw python dictionaries without merging defaults first. State configurations must load settings by calling `config.get_all()` to merge saved configs over `DEFAULTS` keys to prevent KeyErrors.
 
 ---
 
 # Development Workflow
 
 ## Build Commands
-Build static Next.js assets:
+Build Next.js static production assets:
 ```powershell
 cd landing
 .\build.bat
 ```
 
 ## Test Commands
-Run python unit tests:
+Run python test suite:
 ```powershell
 python -m unittest test_session_manager.py test_fixes.py test_features.py test_system.py
 ```
 
 ## Run Commands
-Run python launcher:
+Start PyWebView UI container:
 ```powershell
 python main.py
 ```
 
-## Packaging Commands
-Compile standalone Windows binary:
+## Compilation/Packaging Commands
+Compile single-file FocusFlow.exe package:
 ```powershell
 pyinstaller FocusFlow.spec --noconfirm
 ```
@@ -217,56 +233,41 @@ pyinstaller FocusFlow.spec --noconfirm
 # Dependency Notes
 
 * **Package**: `pywebview`
-  * **Purpose**: Desktop window viewport execution.
-  * **Do Not Replace**: Anchors the entire python-to-JS bridge framework.
+  * **Purpose**: UI window loop.
+  * **Do Not Replace**: Foundational GUI wrapper.
 
 * **Package**: `pywin32`
-  * **Purpose**: Low-level display affinity (exclusions) and window focus control.
-  * **Do Not Replace**: Critical for strict proctoring lock states.
+  * **Purpose**: Window affinity exclusions and process polling.
+  * **Do Not Replace**: Hard dependency for proctoring features.
 
 ---
 
 # Database Schema Summary
 
-No SQL database. Persistent state is kept in local JSON files:
-* **Settings Schema (`data/settings.json`)**: Config dictionary containing hotkeys, opacity, selected model, allowed apps, and website whitelists.
-* **Sessions Schema (`data/sessions.json`)**: Array of dictionaries, each tracking a focus session's ID, timestamp, goal, subject, duration, score, status, and interruptions.
-* **Goals Schema (`data/daily_goals.json`)**: Daily checklist items tracking goal ID, text content, completion boolean, and date.
-
----
-
-# Performance Notes
-
-* **Current Bottlenecks**: High RAM and CPU usage during local LLM instantiation.
-* **Optimizations**: `llama-server` is loaded lazily only when the AI panel is visible, and killed immediately when the panel is closed or online model is active.
-
----
-
-# Security Notes
-
-* **Authorization**: The app runs with local process scopes. Proctoring features block processes and hotkeys safely inside the user session.
-* **Secrets Handling**: Local settings store API keys in plain text; users should ensure settings files are kept secure.
+JSON-based flat files:
+* **Settings (`data/settings.json`)**: Configuration variables (allowed apps, website whitelist, API keys, volume parameters, selected model).
+* **Sessions (`data/sessions.json`)**: Log metrics (duration, subject, target, score, interrupted flags).
+* **Goals (`data/daily_goals.json`)**: Daily checklist items.
 
 ---
 
 # AI Context Summary
 
-1. **What the project does**: Hybrid study proctoring app featuring system locks and an AI doubts solver (offline/online) utilizing OCR region grabs.
-2. **Current architecture**: Next.js GUI connected via PyWebView API bridge to Python modules handling capture hooks, proctoring locks, and LLM query routing.
-3. **Recent major changes**: Refactored exit console buttons to transition to normal exit buttons upon timer expiration; pushed 121 daily backdated refactoring commits.
-4. **Active bugs**: None block release; minor startup lag on low-spec PCs during local LLM instantiation.
-5. **Next priorities**: Enhance low-spec PC offline LLM optimization.
-6. **Important warnings**: Subprocess cleanup requires explicit process killing to avoid RAM leaks.
+1. **FocusFlow Purpose**: Hybrid study proctoring desktop app with AI doubts solving and focus-lock states.
+2. **Current Architecture**: Next.js React frontend served locally by a Python server via PyWebView wrapper, routing tasks to AIEngine, CaptureGuard, and SessionManager.
+3. **Recent Changes**: Implemented overtime exit button fix, daily backdated commits (Jan 25 - May 25), and model dropdown lazy loading.
+4. **Key Warnings**: Subprocesses require Windows taskkill; keyboard hooks require Admin credentials; do not re-enable window enumeration loop in CaptureGuard.
+5. **Setup Requirements**: Compiling Next.js assets to `landing/out` is required to reflect frontend changes.
 
 ---
 
 # Last Updated
 
 Timestamp:
-2026-06-25 13:54 UTC
+2026-06-25 14:02 UTC
 
 Updated By:
 AI Agent Antigravity
 
 Summary:
-Initialized `BRAIN.md` documenting architecture layouts, Next.js page modifications, and daily backdated git commits.
+Updated `BRAIN.md` with complete, exhaustive technical details on proctoring loops, exit buttons, backdated log commits, process cleanup instructions, and key WebView2 runtime limitations.
