@@ -69,3 +69,11 @@ FocusFlow-Publisher.cer
 FocusFlow-v*.zip
 FocusFlow-v*.zip.*
 FocusFlow.spec
+
+# Local-only AI Agent persistent memory and planning files
+BRAIN.md
+ROADMAP.md
+DECISIONS.md
+HANDOVER.md
+SESSION.md
+
