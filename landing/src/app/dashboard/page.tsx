@@ -40,6 +40,7 @@ interface AppSettings {
   strict_allowed_apps?: string[];
   moderate_allowed_apps?: string[];
   moderate_allowed_websites?: string[];
+  llm_model_path?: string;
 }
 
 export default function DashboardPage() {
@@ -99,10 +100,14 @@ export default function DashboardPage() {
   // --- Focus Session States ---
   const [sessionActive, setSessionActive] = useState<boolean>(false);
   const [sessionPaused, setSessionPaused] = useState<boolean>(false);
+  const sessionPausedRef = useRef<boolean>(false);
+  const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
   const [sessionGoal, setSessionGoal] = useState<string>("");
   const [sessionSubject, setSessionSubject] = useState<string>("Physics");
   const [sessionDuration, setSessionDuration] = useState<number>(25);
   const [sessionMode, setSessionMode] = useState<string>("light");
+  const [chosenCodingApp, setChosenCodingApp] = useState<string>("Code.exe");
+  const [customCodingAppText, setCustomCodingAppText] = useState<string>("");
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [customFeatures, setCustomFeatures] = useState({
     keyboard_lock: false,
@@ -112,6 +117,10 @@ export default function DashboardPage() {
     fullscreen: false,
     capture_protection: true,
   });
+
+  useEffect(() => {
+    sessionPausedRef.current = sessionPaused;
+  }, [sessionPaused]);
 
   // --- Coding Sandbox States ---
   const [enableCodingSandbox, setEnableCodingSandbox] = useState<boolean>(false);
@@ -302,7 +311,9 @@ export default function DashboardPage() {
       setSessionActive(false);
       
       if (status === "interrupted") {
-        showToast("Focus session aborted by system lock override!", "warning");
+        showToast("Focus session aborted! Score penalty applied.", "error");
+      } else if (status === "partially_completed") {
+        showToast("Focus session ended early as partially completed.", "warning");
       } else {
         showToast("Focus session completed successfully!", "success");
       }
@@ -406,7 +417,7 @@ export default function DashboardPage() {
         setActiveTab("session");
         startTimer();
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error loading data from Python API: ", e);
     }
   };
@@ -462,9 +473,11 @@ export default function DashboardPage() {
     
     if (isWebviewReady) {
       const api = (window as any).pywebview.api;
+      const activeCodingApp = chosenCodingApp === "custom" ? customCodingAppText.trim() : chosenCodingApp;
       const featuresToSend = {
         ...customFeatures,
-        coding_sandbox: enableCodingSandbox
+        coding_sandbox: enableCodingSandbox,
+        chosen_coding_app: activeCodingApp
       };
       await api.start_focus_session(sessionGoal, sessionSubject, sessionDuration, sessionMode, featuresToSend);
     }
@@ -496,7 +509,7 @@ export default function DashboardPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       showToast(`Saved script successfully!`, "success");
-    } catch (e) {
+    } catch (e: any) {
       showToast(`Failed to save script: ${e.message}`, "error");
     }
   };
@@ -516,7 +529,7 @@ export default function DashboardPage() {
         const fn = new Function(sandboxCode);
         fn();
         setSandboxOutput(output || "Code executed successfully with no output.\n");
-      } catch (err) {
+      } catch (err: any) {
         setSandboxOutput(output + `Execution Error: ${err.message}\n`);
       } finally {
         console.log = originalLog;
@@ -538,7 +551,7 @@ export default function DashboardPage() {
         } else {
           setSandboxOutput("Python execution not available: WebView API bridge missing.\n");
         }
-      } catch (err) {
+      } catch (err: any) {
         setSandboxOutput(`Execution failed: ${err.message}\n`);
       } finally {
         setSandboxRunning(false);
@@ -552,28 +565,30 @@ export default function DashboardPage() {
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
+      if (sessionPausedRef.current) return;
       setTimeLeft((prev) => prev - 1);
     }, 1000);
   };
 
-  const handleStopSession = async () => {
+  const handleStopSession = async (explicitStatus?: string) => {
+    const isSuccess = timeLeft <= 0;
+    
+    if (!isSuccess && !explicitStatus) {
+      setSessionPaused(true);
+      setShowExitConfirm(true);
+      return;
+    }
+
     if (timerRef.current) clearInterval(timerRef.current);
     setSessionActive(false);
+    setShowExitConfirm(false);
+    setSessionPaused(false);
 
     const elapsedSecs = targetTime - timeLeft;
     const elapsedMins = Math.max(1, Math.ceil(elapsedSecs / 60));
     const targetMins = Math.ceil(targetTime / 60);
 
-    const isSuccess = timeLeft <= 0;
-    let status = "completed";
-
-    if (!isSuccess) {
-      status = confirm("Session was stopped before target time. Did you complete your goal?")
-        ? "completed"
-        : confirm("Did you partially complete it?")
-          ? "partially_completed"
-          : "interrupted";
-    }
+    let status = explicitStatus || "completed";
 
     if (isWebviewReady) {
       const api = (window as any).pywebview.api;
@@ -603,11 +618,32 @@ export default function DashboardPage() {
     showToast(`Session ended. Status: ${status.replace("_", " ")}`, status === "completed" ? "success" : "warning");
     setActiveTab("desktop");
     resetSessionInputs();
+    setPdfUrl("");
+  };
+
+  const handleCancelExit = () => {
+    setShowExitConfirm(false);
+    setSessionPaused(false);
+    startTimer();
   };
 
   const handleExtendSession = () => {
     setTimeLeft((prev) => prev + 15 * 60);
     setTargetTime((prev) => prev + 15 * 60);
+  };
+
+  const handleBrowseModel = async () => {
+    if (typeof window !== "undefined" && (window as any).pywebview?.api?.open_model_selector) {
+      const path = await (window as any).pywebview.api.open_model_selector();
+      if (path) {
+        const newSettings = { ...settings, llm_model_path: path };
+        setSettings(newSettings);
+        if (isWebviewReady) {
+          (window as any).pywebview.api.save_settings(newSettings);
+        }
+        showToast(`Integrated custom model: ${path.split('\\').pop()}`, "success");
+      }
+    }
   };
 
   const handleAddApp = () => {
@@ -1129,7 +1165,7 @@ export default function DashboardPage() {
                 <div className="flex flex-col items-center space-y-2">
                   {timeLeft <= 0 ? (
                     <button
-                      onClick={handleStopSession}
+                      onClick={() => handleStopSession()}
                       className="px-6 py-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/10 hover:bg-emerald-950/30 text-xs text-emerald-400 font-bold transition-all active:scale-95 flex items-center space-x-1.5 shadow-lg shadow-emerald-500/5"
                     >
                       <Check className="w-4 h-4" />
@@ -1726,6 +1762,46 @@ export default function DashboardPage() {
                   </motion.div>
                 )}
 
+                {/* Computer Science Allowed Coding Application (Moderate Mode) */}
+                {sessionSubject === "Computer Science" && sessionMode === "moderate" && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-lg bg-zinc-950 border border-zinc-900 space-y-3 transition-all"
+                  >
+                    <div className="flex flex-col">
+                      <label className="text-xs font-semibold text-white">
+                        Allowed Coding Application (Moderate Mode)
+                      </label>
+                      <p className="text-zinc-550 text-[10px] mt-0.5 leading-relaxed">
+                        Select which coding application you want to whitelist for this session. It will bypass foreground blocking checks.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <select
+                        value={chosenCodingApp}
+                        onChange={(e) => setChosenCodingApp(e.target.value)}
+                        className="bg-zinc-950 border border-zinc-900 rounded-lg p-2 text-xs focus:outline-none focus:border-zinc-800 text-white"
+                      >
+                        <option value="Code.exe">VS Code (Code.exe)</option>
+                        <option value="pycharm64.exe">PyCharm (pycharm64.exe)</option>
+                        <option value="idle.exe">Python IDLE (idle.exe)</option>
+                        <option value="notepad++.exe">Notepad++ (notepad++.exe)</option>
+                        <option value="custom">Custom (Type below)...</option>
+                      </select>
+                      {chosenCodingApp === "custom" && (
+                        <input
+                          type="text"
+                          placeholder="e.g. eclipse.exe"
+                          value={customCodingAppText}
+                          onChange={(e) => setCustomCodingAppText(e.target.value)}
+                          className="bg-zinc-950 border border-zinc-900 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-800"
+                        />
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Duration & Mode */}
                 <div className="grid grid-cols-3 gap-4">
                   <div className="col-span-1">
@@ -2032,7 +2108,7 @@ export default function DashboardPage() {
               <div className="flex flex-col items-center space-y-2">
                 {timeLeft <= 0 ? (
                   <button
-                    onClick={handleStopSession}
+                    onClick={() => handleStopSession()}
                     className="px-6 py-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/10 hover:bg-emerald-950/30 text-xs text-emerald-400 font-bold transition-all active:scale-95 flex items-center space-x-1.5 shadow-lg shadow-emerald-500/5"
                   >
                     <Check className="w-4 h-4" />
@@ -2412,6 +2488,44 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+                {/* Offline Custom Model Manager */}
+                <div className="space-y-4 border-t border-zinc-950 pt-4">
+                  <h3 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">Offline AI GGUF Models</h3>
+                  <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-900 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-white block">Active Model Path</span>
+                        <span className="text-[10px] text-zinc-550 font-mono break-all block mt-0.5">{settings.llm_model_path || "models/Phi-3-mini-4k-instruct-q4.gguf"}</span>
+                      </div>
+                      <button
+                        onClick={handleBrowseModel}
+                        className="px-3 py-1.5 rounded bg-zinc-900 hover:bg-zinc-805 border border-zinc-850 text-[10px] text-white font-semibold transition-colors"
+                      >
+                        Browse GGUF
+                      </button>
+                    </div>
+
+                    <div className="text-[11px] text-zinc-400 space-y-2 leading-relaxed">
+                      <p className="font-semibold text-zinc-300">Download Custom GGUF Models:</p>
+                      <ul className="list-disc pl-4 space-y-1">
+                        <li>
+                          <strong>Phi-3 Mini 3.8B (Default)</strong>: Recommended for 8GB+ RAM. (~2.2 GB)
+                          <a href="https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf" target="_blank" className="text-purple-400 hover:text-purple-300 ml-1 underline">Download GGUF</a>
+                        </li>
+                        <li>
+                          <strong>Qwen-2.5 1.5B (Low-Spec)</strong>: Recommended for 4GB-6GB RAM setups. (~900 MB)
+                          <a href="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF" target="_blank" className="text-purple-400 hover:text-purple-300 ml-1 underline">Download GGUF</a>
+                        </li>
+                        <li>
+                          <strong>Llama-3 8B (High-Spec)</strong>: Recommended for 16GB+ RAM setups. (~4.7 GB)
+                          <a href="https://huggingface.co/MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF" target="_blank" className="text-purple-400 hover:text-purple-300 ml-1 underline">Download GGUF</a>
+                        </li>
+                      </ul>
+                      <p className="text-[10px] text-zinc-500 italic mt-2 font-mono">Tip: You can save models anywhere on your PC and click 'Browse GGUF' to integrate them. No manual copying required!</p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Whitelisting details info */}
                 <div className="space-y-4 border-t border-zinc-950 pt-4">
                   <h3 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">Interactive Application Whitelists</h3>
@@ -2591,6 +2705,57 @@ export default function DashboardPage() {
             {toast.type === "info" && <Compass className="w-4 h-4 text-blue-400 flex-shrink-0 animate-spin" />}
             <span>{toast.message}</span>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Early Exit Confirmation Modal */}
+      <AnimatePresence>
+        {showExitConfirm && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-2xl p-6 space-y-6 shadow-2xl"
+            >
+              <div className="space-y-2">
+                <h3 className="text-sm font-mono tracking-widest text-red-500 uppercase font-bold">WARNING: Early Exit Attempted</h3>
+                <p className="text-zinc-300 text-xs leading-relaxed">
+                  You are stopping the focus session before completing your target time. Did you complete your study goal?
+                </p>
+                <div className="bg-zinc-900/50 border border-zinc-900 p-2.5 rounded-lg text-[10px] text-zinc-500 font-mono italic">
+                  "{sessionGoal}"
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-2.5">
+                <button
+                  onClick={() => handleStopSession("completed")}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold font-sans transition-all active:scale-95 shadow-md shadow-emerald-500/10"
+                >
+                  Yes, Goal Completed Successfully
+                </button>
+                <button
+                  onClick={() => handleStopSession("partially_completed")}
+                  className="w-full py-2 bg-amber-600/10 border border-amber-500/20 text-amber-400 hover:bg-amber-955/20 rounded-lg text-xs font-semibold font-sans transition-all active:scale-95"
+                >
+                  Partially Completed
+                </button>
+                <button
+                  onClick={() => handleStopSession("interrupted")}
+                  className="w-full py-2 bg-red-950/20 border border-red-500/20 text-[#ef4444] hover:bg-red-950/40 rounded-lg text-xs font-semibold font-sans transition-all active:scale-95"
+                >
+                  No, Aborted (Score Penalty Applied)
+                </button>
+                <button
+                  onClick={handleCancelExit}
+                  className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg text-xs font-medium font-mono transition-all"
+                >
+                  Cancel & Resume Study
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

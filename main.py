@@ -310,9 +310,13 @@ class FocusFlowApp:
         self.guard_thread: Optional[threading.Thread] = None
 
         # --- Start local HTTP server ---
+        import mimetypes
+        mimetypes.add_type('application/pdf', '.pdf')
+        
         static_dir = BASE_DIR / "landing" / "out"
         self.server = ThreadedHTTPServer("127.0.0.1", 5000, str(static_dir))
         self.server.start()
+
 
         # --- Register cleanup ---
         atexit.register(self.cleanup)
@@ -671,6 +675,11 @@ class FocusFlowApp:
                                 proc_lower = proc_name.lower() if proc_name else ""
                                 allowed_apps_lower = [app.lower() for app in allowed_apps]
                                 
+                                # Include dynamically whitelisted coding application
+                                chosen_app = self.session_features.get("chosen_coding_app")
+                                if chosen_app:
+                                    allowed_apps_lower.append(chosen_app.lower())
+                                
                                 if proc_lower in allowed_apps_lower:
                                     browsers = ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "iexplore.exe"]
                                     if proc_lower in browsers:
@@ -754,6 +763,12 @@ class FocusFlowApp:
             ]
             
         allowed_apps_lower = {app.lower() for app in allowed_apps}
+        
+        # Include dynamically whitelisted coding application
+        chosen_app = self.session_features.get("chosen_coding_app")
+        if chosen_app:
+            allowed_apps_lower.add(chosen_app.lower())
+
         
         # Hardcoded additional whitelist fallback for safety
         system_whitelist = {
@@ -906,6 +921,29 @@ class FocusFlowApp:
                 self.window.evaluate_js("if (window.loadPdfInApp) window.loadPdfInApp('/temp_pdf/selected.pdf');")
         except Exception as e:
             logger.error(f"Error opening study PDF: {e}")
+
+    def open_model_dialog(self) -> Optional[str]:
+        """Trigger native Open File dialog to pick GGUF model and save to settings."""
+        try:
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            
+            from tkinter import filedialog
+            file_path = filedialog.askopenfilename(
+                parent=root,
+                title="Select Local GGUF Model File",
+                filetypes=[("GGUF files", "*.gguf")]
+            )
+            root.destroy()
+            
+            if file_path:
+                self.config.set("llm_model_path", file_path)
+                logger.info(f"Integrated custom GGUF model: {file_path}")
+                return file_path
+        except Exception as e:
+            logger.error(f"Error selecting custom model file: {e}")
+        return None
 
     def _manage_desktop_shortcut(self, create: bool) -> None:
         """Create or remove the Student Tools link on the desktop."""

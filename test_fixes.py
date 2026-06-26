@@ -156,13 +156,18 @@ class TestFocusFlowFixes(unittest.TestCase):
         app_mock = MagicMock()
         app_mock.config = self.config
         app_mock.ai = MagicMock()
+        app_mock.ai_panel_visible = True
         
-        # Call _on_mode_change to transition to online
-        from main import FocusFlowApp
-        FocusFlowApp._on_mode_change(app_mock, "online")
+        # Call save_settings on FocusFlowAPI to transition to online
+        from app_bridge import FocusFlowAPI
+        from unittest.mock import patch
         
-        # Ensure ai.stop() was called to terminate llama-server
-        app_mock.ai.stop.assert_called_once()
+        bridge = FocusFlowAPI(app_mock)
+        with patch('threading.Thread') as mock_thread:
+            bridge.save_settings({"online_model": "gpt-4o"})
+            mock_thread.assert_called_once()
+            kwargs = mock_thread.call_args[1]
+            self.assertEqual(kwargs.get('target'), app_mock.ai.stop)
 
     def test_settings_dialog_persona_in_all_modes(self):
         """Verify settings dialog exposes and updates persona selector in all run modes."""

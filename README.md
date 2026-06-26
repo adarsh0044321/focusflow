@@ -138,15 +138,18 @@ No Python installation or dependency setup is required.
      python main.py --mode offline
      ```
 
+3. **For Offline Mode (Local LLM)**:
+   * **Download Model**: Download a GGUF format instruction model from Hugging Face:
+     * **Phi-3 Mini 3.8B (Default)** [~2.2 GB]: Recommended for computers with **8GB+ RAM**. [Download Link](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf)
+     * **Qwen-2.5 1.5B (Low-Spec)** [~900 MB]: Recommended for computers with **4GB-6GB RAM**. [Download Link](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF)
+     * **Llama-3 8B (High-Spec)** [~4.7 GB]: Recommended for computers with **16GB+ RAM**. [Download Link](https://huggingface.co/MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF)
+   * **Integrate directly inside the UI**:
+     * You can save the downloaded `.gguf` file in the default `models/` directory or *any folder on your computer*.
+     * Open settings (**`Ctrl+Shift+S`**), scroll to **Offline AI GGUF Models**, and click **Browse GGUF**.
+     * Select the downloaded model file. FocusFlow will automatically save the absolute path and resolve it at startup. No manual copying or symlinks required.
+
 ---
 
-### ⚙️ Initial Configuration
-Once the application is running (from executable or source), configure the settings drawer:
-1. Press **`Ctrl+Shift+S`** (or click the settings gear icon on the Control Panel) to open the Config panel.
-2. **For Online Mode**: Enter one or more OpenAI API keys in the online API key field and click **Add**. FocusFlow will rotate keys automatically if one hits rate limits or quota issues. Select your desired model (e.g. `gpt-4o` or `gpt-4o-mini`) from the dropdown.
-3. **For Offline Mode**: Ensure the local GGUF model file is placed in `models/` and matches the path configured in Settings (defaults to `models/Phi-3-mini-4k-instruct-q4.gguf`).
-
----
 
 ## 🎮 How to Use
 

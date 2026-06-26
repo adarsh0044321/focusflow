@@ -258,6 +258,15 @@ class FocusFlowAPI:
             self._logger.error(f"Error saving settings: {e}")
             return False
 
+    def open_model_selector(self) -> Optional[str]:
+        """Open a native Windows file selection dialog to choose a custom GGUF model."""
+        try:
+            self._logger.info("Opening GGUF model selector...")
+            return self._app.open_model_dialog()
+        except Exception as e:
+            self._logger.error(f"Error selecting custom GGUF model: {e}")
+            return None
+
     # --- External Windows Utilities (Strict Mode Allowed) ---
     def open_file_explorer(self) -> None:
         """Open Windows File Explorer (Safe whitelist command)."""

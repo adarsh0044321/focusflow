@@ -126,7 +126,11 @@ class ConfigManager:
         Returns:
             The resolved absolute :class:`~pathlib.Path`.
         """
-        return (self._base_dir / relative).resolve()
+        p = Path(relative)
+        if p.is_absolute():
+            return p.resolve()
+        return (self._base_dir / p).resolve()
+
 
     # ------------------------------------------------------------------
     # Core CRUD

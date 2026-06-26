@@ -127,6 +127,8 @@ class KnowledgeBase:
             if w.endswith("ies"):
                 return w[:-3] + "y"
             if w.endswith("ves"):
+                if w.endswith("ives") and not any(w.endswith(x) for x in ["thieves", "knives", "wives", "lives"]):
+                    return w[:-1]
                 return w[:-3] + "f"
             if w.endswith("es") and not w.endswith("ss"):
                 return w[:-2]
