@@ -336,10 +336,48 @@ class FocusFlowApp:
         # Apply window display affinity on shown
         webview.start(self._on_window_shown)
 
+    def _find_webview_hwnd(self) -> Optional[int]:
+        """Find the main pywebview window handle with fallback strategies."""
+        # 1. Try initial title
+        hwnd = win32gui.FindWindow(None, 'FocusFlow 🪐')
+        if hwnd:
+            return hwnd
+            
+        # 2. Try loaded page title
+        hwnd = win32gui.FindWindow(None, 'FocusFlow | Master Deep Work')
+        if hwnd:
+            return hwnd
+            
+        # 3. Enumerate windows owned by current process
+        pid = os.getpid()
+        found_hwnd = None
+        
+        def enum_cb(h, extra):
+            nonlocal found_hwnd
+            # Verify window belongs to this process
+            try:
+                _, w_pid = win32process.GetWindowThreadProcessId(h)
+                if w_pid == pid:
+                    cls = win32gui.GetClassName(h)
+                    title = win32gui.GetWindowText(h)
+                    if "webview" in cls.lower() or "focusflow" in title.lower():
+                        found_hwnd = h
+                        return False
+            except Exception:
+                pass
+            return True
+            
+        try:
+            win32gui.EnumWindows(enum_cb, None)
+        except Exception:
+            pass
+            
+        return found_hwnd
+
     def _on_window_shown(self) -> None:
         """Callback fired when the WebView2 window has loaded."""
         time.sleep(0.5)  # Wait for window handle creation
-        self.webview_hwnd = win32gui.FindWindow(None, 'FocusFlow 🪐')
+        self.webview_hwnd = self._find_webview_hwnd()
         if self.webview_hwnd:
             # Evasion: Exclude window from screenshots and screen shares
             self.guard.protect_window(self.webview_hwnd)
@@ -487,6 +525,8 @@ class FocusFlowApp:
                 logger.error(f"Failed to enter fullscreen: {e}")
 
         # Dynamic Capture Protection Exclusion
+        if not self.webview_hwnd:
+            self.webview_hwnd = self._find_webview_hwnd()
         if self.webview_hwnd:
             if self.session_features.get("capture_protection"):
                 self.guard.protect_window(self.webview_hwnd)
@@ -542,6 +582,8 @@ class FocusFlowApp:
                 logger.error(f"Failed to exit fullscreen: {e}")
 
         # Restore default capture protection on session exit
+        if not self.webview_hwnd:
+            self.webview_hwnd = self._find_webview_hwnd()
         if self.webview_hwnd:
             self.guard.protect_window(self.webview_hwnd)
             self.guard.start()
@@ -633,6 +675,8 @@ class FocusFlowApp:
         last_full_scan = time.time()
         while self.session_active:
             try:
+                if not self.webview_hwnd:
+                    self.webview_hwnd = self._find_webview_hwnd()
                 now = time.time()
                 if self.session_features.get("app_sweeper") and (now - last_full_scan >= 10.0):
                     last_full_scan = now
