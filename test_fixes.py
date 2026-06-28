@@ -195,6 +195,49 @@ class TestFocusFlowFixes(unittest.TestCase):
         finally:
             root.destroy()
 
+    def test_ai_engine_effective_mode_routing(self):
+        """Verify AIEngine._effective_mode correctly routes based on config and engine states."""
+        from ai_engine import AIEngine
+        mock_config = MagicMock()
+        engine = AIEngine(mock_config)
+        engine.offline = MagicMock()
+        engine.online = MagicMock()
+
+        # 1. run_mode is online/offline directly
+        engine.run_mode = "online"
+        self.assertEqual(engine._effective_mode(), "online")
+        
+        engine.run_mode = "offline"
+        self.assertEqual(engine._effective_mode(), "offline")
+
+        # 2. run_mode is combined/hybrid, check model_setting
+        engine.run_mode = "combined"
+        
+        # model_setting is offline
+        mock_config.get.side_effect = lambda key, default=None: "offline" if key == "online_model" else default
+        self.assertEqual(engine._effective_mode(), "offline")
+
+        # model_setting is gpt-4o (online)
+        mock_config.get.side_effect = lambda key, default=None: "gpt-4o" if key == "online_model" else default
+        self.assertEqual(engine._effective_mode(), "online")
+
+        # model_setting is combined
+        mock_config.get.side_effect = lambda key, default=None: "combined" if key == "online_model" else default
+        
+        # Case A: offline ready -> offline
+        engine.offline.is_ready.return_value = True
+        self.assertEqual(engine._effective_mode(), "offline")
+
+        # Case B: offline not ready, online ready -> online
+        engine.offline.is_ready.return_value = False
+        engine.online.is_ready.return_value = True
+        self.assertEqual(engine._effective_mode(), "online")
+
+        # Case C: neither ready -> offline (fallback)
+        engine.offline.is_ready.return_value = False
+        engine.online.is_ready.return_value = False
+        self.assertEqual(engine._effective_mode(), "offline")
+
 
 if __name__ == "__main__":
     unittest.main()

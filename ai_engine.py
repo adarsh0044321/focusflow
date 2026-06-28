@@ -155,7 +155,6 @@ class AIEngine:
             return "offline"  # fallback
         else: # e.g. gpt-4o, gpt-4o-mini
             return "online"
-        return mode
 
     # ------------------------------------------------------------------
     # Solve (main entry point)

@@ -1,3 +1,28 @@
+# FocusFlow v1.4.0 — Proctoring Exit Modal, Dynamic Coding App, Inline PDF & GGUF Model Selector
+
+This release resolves critical bugs in FocusFlow's proctoring exit sequence, adds inline PDF viewing within WebView2, whitelists custom coding applications dynamically in Moderate Mode, and introduces native file selection for custom GGUF models.
+
+## 🚀 Key Features & Enhancements
+
+### 🚪 1. Smart Proctoring Early-Exit Modal
+* **Confirmation Dialog**: Replaced simple alert prompts with a full React confirmation modal that freezes the focus timer.
+* **Exit Status Routing**: Prompts users to log their exit status as "Goal Completed Successfully" (regular completion), "Partially Completed" (partial credit), or "Aborted/Abrupt Exit" (score penalty applied).
+* **Distinct Feedback**: Displays dynamic green, amber, or red toasts depending on the selected exit reason.
+
+### 💻 2. Dynamic Coding App Whitelisting
+* **Moderate Mode Subject Selector**: In Moderate Mode, when the chosen subject is "Computer Science", users can select/whitelist their custom coding application (e.g. VS Code, PyCharm, IDLE).
+* **Dynamic Whitelist Injection**: Dynamically whitelists the selected coding executable, preventing the proctoring engine from closing it on launch.
+
+### 📄 3. Inline PDF View Integration
+* **Dynamic MIME Association**: Registers the `application/pdf` MIME type directly inside the Python local HTTP server. This forces WebView2 to render study files inline in the HUD viewport rather than downloading them externally or triggering Chrome browser launches.
+
+### 🧠 4. Native GGUF Model Selection & Guidelines
+* **Native File Dialog**: Spawns a topmost Windows Open File browser to select custom `.gguf` files saved anywhere on the machine, writing the absolute path directly to settings.
+* **Model Portability**: Resolved relative path bugs so that moving the application directory (`dist/`) does not break offline LLM initialization.
+* **RAM & Specs Documentation**: Integrated Hugging Face download links and RAM specifications (e.g., Phi-3 Mini for 8GB+ RAM, Qwen-2.5 1.5B for 4GB-6GB RAM, Llama-3 8B for 16GB+ RAM) directly in Settings and the README.
+
+---
+
 # FocusFlow v1.3.0 — Unified AI Engine & Strict Lazy LLM Controller
 
 This release consolidates FocusFlow modes into a single unified application entry and provides optimized lazy lifecycle resource control for the offline LLM model.
