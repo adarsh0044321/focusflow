@@ -16,6 +16,7 @@ import winreg
 import subprocess
 import threading
 import time
+import json
 import ctypes
 import ctypes.wintypes
 import tkinter as tk
@@ -761,8 +762,7 @@ class FocusFlowApp:
                             
                             if self.webview_hwnd:
                                 win32gui.SetForegroundWindow(self.webview_hwnd)
-                                escaped_proc = (proc_name or "Unknown").replace("'", "\\'")
-                                self.window.evaluate_js(f"window.showBlockedAlert('{escaped_proc}')")
+                                self.window.evaluate_js(f"window.showBlockedAlert({json.dumps(proc_name or 'Unknown')})")
             except Exception as e:
                 logger.error(f"Error in guard loop: {e}")
             time.sleep(0.3)
@@ -894,27 +894,30 @@ class FocusFlowApp:
             def select_thread():
                 root = tk.Tk()
                 root.withdraw()
-                
-                def on_select(x, y, w, h):
-                    self.config.set("region_x", x)
-                    self.config.set("region_y", y)
-                    self.config.set("region_w", w)
-                    self.config.set("region_h", h)
-                    
-                    # Capture screen region
-                    img = self.capture.capture_region()
-                    
-                    # Run OCR
-                    raw_text, ocr_err = self.ocr.extract_text(img)
-                    cleaned, _, _ = self.cleaner.clean(raw_text)
-                    self.ocr_text = cleaned
-                    root.destroy()
-                    
-                def on_cancel():
-                    root.destroy()
-                    
-                self.capture.select_region_interactive(on_select, on_cancel=on_cancel, root=root)
-                root.mainloop()
+                try:
+                    def on_select(x, y, w, h):
+                        self.config.set("region_x", x)
+                        self.config.set("region_y", y)
+                        self.config.set("region_w", w)
+                        self.config.set("region_h", h)
+                        
+                        # Capture screen region
+                        img = self.capture.capture_region()
+                        
+                        # Run OCR
+                        raw_text, ocr_err = self.ocr.extract_text(img)
+                        cleaned, _, _ = self.cleaner.clean(raw_text)
+                        self.ocr_text = cleaned
+                        
+                    def on_cancel():
+                        pass
+                        
+                    self.capture.select_region_interactive(on_select, on_cancel=on_cancel, root=root)
+                finally:
+                    try:
+                        root.destroy()
+                    except Exception:
+                        pass
                 
             t = threading.Thread(target=select_thread)
             t.start()
@@ -926,11 +929,11 @@ class FocusFlowApp:
             
             # 3. Paste OCR text into JS
             if self.ocr_text:
-                escaped = self.ocr_text.replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
-                self.window.evaluate_js(f"window.setOcrResult('{escaped}')")
+                self.window.evaluate_js(f"window.setOcrResult({json.dumps(self.ocr_text)})")
                 logger.info(f"Successfully processed OCR and sent to JS: {len(self.ocr_text)} chars")
             else:
                 logger.warning("OCR capture was empty or cancelled.")
+
         except Exception as e:
             logger.error(f"Failed to execute OCR capture: {e}")
             if self.window:
@@ -938,19 +941,16 @@ class FocusFlowApp:
 
     def open_pdf_dialog(self) -> None:
         """Trigger native Open File dialog to pick study PDF and copy to serve inside WebView."""
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
         try:
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            
             from tkinter import filedialog
             file_path = filedialog.askopenfilename(
                 parent=root,
                 title="Select Study PDF",
                 filetypes=[("PDF files", "*.pdf")]
             )
-            root.destroy()
-            
             if file_path:
                 import shutil
                 # Create destination directory inside Next.js static files
@@ -965,29 +965,37 @@ class FocusFlowApp:
                 self.window.evaluate_js("if (window.loadPdfInApp) window.loadPdfInApp('/temp_pdf/selected.pdf');")
         except Exception as e:
             logger.error(f"Error opening study PDF: {e}")
+        finally:
+            try:
+                root.destroy()
+            except Exception:
+                pass
 
     def open_model_dialog(self) -> Optional[str]:
         """Trigger native Open File dialog to pick GGUF model and save to settings."""
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
         try:
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            
             from tkinter import filedialog
             file_path = filedialog.askopenfilename(
                 parent=root,
                 title="Select Local GGUF Model File",
                 filetypes=[("GGUF files", "*.gguf")]
             )
-            root.destroy()
-            
             if file_path:
                 self.config.set("llm_model_path", file_path)
                 logger.info(f"Integrated custom GGUF model: {file_path}")
                 return file_path
         except Exception as e:
             logger.error(f"Error selecting custom model file: {e}")
+        finally:
+            try:
+                root.destroy()
+            except Exception:
+                pass
         return None
+
 
     def _manage_desktop_shortcut(self, create: bool) -> None:
         """Create or remove the Student Tools link on the desktop."""

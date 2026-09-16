@@ -5,6 +5,8 @@ import os
 import tempfile
 from config_manager import ConfigManager
 from history_manager import HistoryManager
+from app_bridge import FocusFlowAPI
+
 
 class TestFocusFlowEnhancements(unittest.TestCase):
 
@@ -15,6 +17,7 @@ class TestFocusFlowEnhancements(unittest.TestCase):
         self.config = MagicMock(spec=ConfigManager)
         self.config.get.side_effect = lambda key, default=None: default
         self.config.get_api_keys.return_value = []
+        self.config.get_all.return_value = {"theme": "dark", "llm_mode": "offline"}
 
     def tearDown(self):
         try:
@@ -22,65 +25,50 @@ class TestFocusFlowEnhancements(unittest.TestCase):
         except:
             pass
 
-    def test_clipboard_duplicate_detection_logic(self):
-        """Verify that clipboard text matches last solved prompts or answers are ignored."""
-        from main import FocusFlowApp
+    def test_focusflow_api_run_code_python(self):
+        """Verify that FocusFlowAPI runs valid Python code in the sandbox."""
+        mock_app = MagicMock()
+        api = FocusFlowAPI(mock_app)
+        res = api.run_code("python", "print('FocusFlow Test Sandbox')")
+        self.assertEqual(res["exit_code"], 0)
+        self.assertIn("FocusFlow Test Sandbox", res["stdout"])
+        self.assertEqual(res["stderr"], "")
+
+    def test_focusflow_api_run_code_unsupported(self):
+        """Verify that FocusFlowAPI returns error for unsupported languages."""
+        mock_app = MagicMock()
+        api = FocusFlowAPI(mock_app)
+        res = api.run_code("unsupported_lang", "test")
+        self.assertEqual(res["exit_code"], -1)
+        self.assertIn("Unsupported sandbox language", res["stderr"])
+
+    def test_focusflow_api_settings_bridge(self):
+        """Verify that save_settings and get_settings interact correctly with config."""
+        mock_app = MagicMock()
+        mock_app.config = self.config
+        api = FocusFlowAPI(mock_app)
         
-        # Instantiate a mock app with mocked Tk root, config, and panel classes
-        with patch("main.PipelinePanel") as mock_pipeline_cls, \
-             patch("main.ControlPanel") as mock_control_cls, \
-             patch("main.AnswerPanel") as mock_answer_cls, \
-             patch("main.SettingsDialog") as mock_settings_cls, \
-             patch.object(FocusFlowApp, "_init_guard"), \
-             patch.object(FocusFlowApp, "_register_hotkeys"), \
-             patch.object(FocusFlowApp, "_init_ai"):
-             
-            app = FocusFlowApp()
-            app.root = self.root
-            app.config = self.config
-            app._cleaned_up = False
-            
-            # Setup config mock to return clipboard monitor enabled
-            self.config.get.side_effect = lambda key, default=None: True if key == "clipboard_monitor_enabled" else default
-            
-            # Set state indicators
-            app._last_clipboard_text = "Original Clip"
-            app._last_ocr_text = "Solved Prompt"
-            app._last_raw_text = "Raw Prompt"
-            app._last_ai_answer = "AI Answer"
-            
-            # Setup manual solve mock
-            app._solve_manual_text = MagicMock()
-            
-            # 1. Test duplicate clip text
-            self.root.clipboard_clear()
-            self.root.clipboard_append("Original Clip")
-            app.check_clipboard()
-            app._solve_manual_text.assert_not_called()
-            
-            # 2. Test duplicate solved prompt
-            self.root.clipboard_clear()
-            self.root.clipboard_append("Solved Prompt")
-            app.check_clipboard()
-            app._solve_manual_text.assert_not_called()
-            
-            # 3. Test duplicate raw prompt
-            self.root.clipboard_clear()
-            self.root.clipboard_append("Raw Prompt")
-            app.check_clipboard()
-            app._solve_manual_text.assert_not_called()
-            
-            # 4. Test duplicate AI answer
-            self.root.clipboard_clear()
-            self.root.clipboard_append("AI Answer")
-            app.check_clipboard()
-            app._solve_manual_text.assert_not_called()
-            
-            # 5. Test new fresh text
-            self.root.clipboard_clear()
-            self.root.clipboard_append("New Question to Solve")
-            app.check_clipboard()
-            app._solve_manual_text.assert_called_once_with("New Question to Solve")
+        # Test get_settings
+        settings = api.get_settings()
+        self.assertIsInstance(settings, dict)
+        self.assertEqual(settings.get("theme"), "dark")
+
+        # Test save_settings
+        success = api.save_settings({"theme": "light", "focus_duration": 45})
+        self.assertTrue(success)
+        self.config.set.assert_any_call("theme", "light")
+        self.config.set.assert_any_call("focus_duration", 45)
+
+    def test_focusflow_api_query_ai(self):
+        """Verify that query_ai_assistant formats and dispatches questions properly."""
+        mock_app = MagicMock()
+        mock_app.ai.solve_manual.return_value = {"answer": "Derived answer"}
+        
+        api = FocusFlowAPI(mock_app)
+        res = api.query_ai_assistant("Solve x + 2 = 5", "doubt_solver")
+        self.assertEqual(res, "Derived answer")
+        mock_app.ai.solve_manual.assert_called_once()
+
 
     def test_study_guide_markdown_export(self):
         """Verify that study guide compile logic generates valid Markdown."""
@@ -145,40 +133,7 @@ class TestFocusFlowEnhancements(unittest.TestCase):
             if os.path.exists(export_path):
                 os.remove(export_path)
 
-    def test_panel_hiding_during_solve(self):
-        """Verify that solve triggers hide panels and schedules show panels after capture."""
-        from main import FocusFlowApp
-        
-        with patch("main.PipelinePanel") as mock_pipeline_cls, \
-             patch("main.ControlPanel") as mock_control_cls, \
-             patch("main.AnswerPanel") as mock_answer_cls, \
-             patch("main.SettingsDialog") as mock_settings_cls, \
-             patch.object(FocusFlowApp, "_init_guard"), \
-             patch.object(FocusFlowApp, "_register_hotkeys"), \
-             patch.object(FocusFlowApp, "_init_ai"):
-
-            app = FocusFlowApp()
-            app.root = self.root
-            app.capture = MagicMock()
-            app.capture.capture.return_value = MagicMock()
-            app._hide_panels = MagicMock()
-            app._show_panels = MagicMock()
-            
-            # Setup thread run
-            app._on_solve()
-            
-            # Verify hide panels was called immediately on main thread
-            app._hide_panels.assert_called_once()
-            
-            # Run background thread synchronously to test show callback
-            app._solve_pipeline(rerun=False)
-            
-            # Wait for any scheduled actions on main thread queue
-            self.root.update()
-            
-            # Verify show panels was called (which schedules self._show_panels on main thread)
-            app._show_panels.assert_called_once()
-
 
 if __name__ == "__main__":
     unittest.main()
+

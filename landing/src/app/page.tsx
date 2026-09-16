@@ -19,6 +19,11 @@ import {
 function CalmOrbitBackground({ scrollProgress }: { scrollProgress: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
+  const scrollProgressRef = useRef(scrollProgress);
+
+  useEffect(() => {
+    scrollProgressRef.current = scrollProgress;
+  }, [scrollProgress]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -96,10 +101,12 @@ function CalmOrbitBackground({ scrollProgress }: { scrollProgress: number }) {
     const animate = () => {
       ctx.clearRect(0, 0, width, height);
       
+      const currentScroll = scrollProgressRef.current;
+
       // Cleansing phase maps scroll 0.2 to 0.5 into calmFactor 0 to 1
       let calmFactor = 0;
-      if (scrollProgress > 0.2) {
-        calmFactor = Math.min((scrollProgress - 0.2) / 0.3, 1);
+      if (currentScroll > 0.2) {
+        calmFactor = Math.min((currentScroll - 0.2) / 0.3, 1);
       }
 
       const tx = mouseRef.current.x;
@@ -111,8 +118,8 @@ function CalmOrbitBackground({ scrollProgress }: { scrollProgress: number }) {
       });
 
       // Ambient messy yellow/orange pencil scratches during the chaos phase
-      if (scrollProgress < 0.25) {
-        const chaosFactor = 1 - (scrollProgress / 0.25);
+      if (currentScroll < 0.25) {
+        const chaosFactor = 1 - (currentScroll / 0.25);
         ctx.fillStyle = `rgba(245, 158, 11, ${chaosFactor * 0.08})`;
         for (let i = 0; i < 15; i++) {
           const rx = Math.random() * width;
@@ -130,7 +137,8 @@ function CalmOrbitBackground({ scrollProgress }: { scrollProgress: number }) {
       window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [scrollProgress]);
+  }, []);
+
 
   return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />;
 }

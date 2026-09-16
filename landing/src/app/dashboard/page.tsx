@@ -250,6 +250,7 @@ export default function DashboardPage() {
   const lofiAudioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const exitHoldRef = useRef<NodeJS.Timeout | null>(null);
+  const isStoppingLocallyRef = useRef<boolean>(false);
 
   // --- Detect Webview Bridge ---
   useEffect(() => {
@@ -273,6 +274,10 @@ export default function DashboardPage() {
         clearTimeout(fallbackTimer);
       }
     };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("pywebviewready", checkBridge);
+    }
     
     // Check multiple times to handle async initialization
     timer1 = setTimeout(checkBridge, 100);
@@ -307,6 +312,10 @@ export default function DashboardPage() {
 
     // Set up native stop callback
     (window as any).stopSessionFromPython = (status: string) => {
+      if (isStoppingLocallyRef.current) {
+        isStoppingLocallyRef.current = false;
+        return;
+      }
       if (timerRef.current) clearInterval(timerRef.current);
       setSessionActive(false);
       
@@ -325,6 +334,9 @@ export default function DashboardPage() {
     };
 
     return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("pywebviewready", checkBridge);
+      }
       clearTimeout(timer1);
       clearTimeout(timer2);
       clearTimeout(timer3);
@@ -332,6 +344,8 @@ export default function DashboardPage() {
       if (timerRef.current) clearInterval(timerRef.current);
       delete (window as any).stopSessionFromPython;
       delete (window as any).loadPdfInApp;
+      delete (window as any).setOcrResult;
+      delete (window as any).showBlockedAlert;
     };
   }, []);
 
@@ -346,6 +360,9 @@ export default function DashboardPage() {
     } else {
       if (rainAudioRef.current) rainAudioRef.current.pause();
     }
+    return () => {
+      if (rainAudioRef.current) rainAudioRef.current.pause();
+    };
   }, [ambientRain]);
 
   useEffect(() => {
@@ -358,6 +375,9 @@ export default function DashboardPage() {
     } else {
       if (noiseAudioRef.current) noiseAudioRef.current.pause();
     }
+    return () => {
+      if (noiseAudioRef.current) noiseAudioRef.current.pause();
+    };
   }, [ambientNoise]);
 
   useEffect(() => {
@@ -369,7 +389,11 @@ export default function DashboardPage() {
     } else {
       if (lofiAudioRef.current) lofiAudioRef.current.pause();
     }
+    return () => {
+      if (lofiAudioRef.current) lofiAudioRef.current.pause();
+    };
   }, [lofiMusic]);
+
 
   // --- Track AI Panel Visibility to start/stop offline LLM server ---
   useEffect(() => {
@@ -405,17 +429,23 @@ export default function DashboardPage() {
           setEnableCodingSandbox(true);
         }
         
-        // Calculate remaining seconds
-        const start = new Date(activeSession.start_time).getTime();
+        // Calculate remaining seconds safely supporting ISO and space-separated date formats
+        const rawStartTime = activeSession.start_time;
+        const normalizedStartTime = typeof rawStartTime === "string"
+          ? rawStartTime.replace(" ", "T")
+          : rawStartTime;
+        const parsedStart = new Date(normalizedStartTime).getTime();
+        const start = isNaN(parsedStart) ? Date.now() : parsedStart;
         const now = Date.now();
-        const elapsedSeconds = Math.floor((now - start) / 1000);
-        const totalSeconds = activeSession.target_duration_mins * 60;
+        const elapsedSeconds = Math.max(0, Math.floor((now - start) / 1000));
+        const totalSeconds = (activeSession.target_duration_mins || 25) * 60;
         const left = Math.max(0, totalSeconds - elapsedSeconds);
         
         setTimeLeft(left);
         setTargetTime(totalSeconds);
         setActiveTab("session");
         startTimer();
+
       }
     } catch (e: any) {
       console.error("Error loading data from Python API: ", e);
@@ -579,6 +609,7 @@ export default function DashboardPage() {
       return;
     }
 
+    isStoppingLocallyRef.current = true;
     if (timerRef.current) clearInterval(timerRef.current);
     setSessionActive(false);
     setShowExitConfirm(false);
@@ -701,6 +732,7 @@ export default function DashboardPage() {
       return;
     }
     
+    if (exitHoldRef.current) clearInterval(exitHoldRef.current);
     setShowExitWarning(true);
     setExitHoldProgress(0);
     
@@ -709,17 +741,24 @@ export default function DashboardPage() {
       current += 2;
       setExitHoldProgress(current);
       if (current >= 100) {
-        clearInterval(exitHoldRef.current!);
+        if (exitHoldRef.current) {
+          clearInterval(exitHoldRef.current);
+          exitHoldRef.current = null;
+        }
         handleStopSession();
       }
     }, 200); // 100% in 10 seconds (50 intervals of 200ms)
   };
 
   const handleExitMouseUp = () => {
-    if (exitHoldRef.current) clearInterval(exitHoldRef.current);
+    if (exitHoldRef.current) {
+      clearInterval(exitHoldRef.current);
+      exitHoldRef.current = null;
+    }
     setExitHoldProgress(0);
     setShowExitWarning(false);
   };
+
 
   // --- Goals Interaction ---
   const handleAddGoal = async () => {
