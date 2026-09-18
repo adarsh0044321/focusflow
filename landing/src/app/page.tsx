@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { 
   motion, 
   AnimatePresence, 
@@ -8,7 +9,8 @@ import {
   useTransform, 
   useMotionValue, 
   useSpring,
-  useMotionTemplate
+  useMotionTemplate,
+  MotionValue
 } from "framer-motion";
 import { 
   Zap, Monitor, Clock, Target, Shield, 
@@ -213,7 +215,7 @@ const distractions = [
 // --- Isolated Distraction Note Component (Resolves Hook Rule issues) ---
 interface DistractionCardProps {
   distraction: typeof distractions[0];
-  scrollYProgress: any;
+  scrollYProgress: MotionValue<number>;
 }
 
 function DistractionCard({ distraction, scrollYProgress }: DistractionCardProps) {
@@ -293,7 +295,7 @@ function DistractionCard({ distraction, scrollYProgress }: DistractionCardProps)
 // --- Isolated Heatmap Row Component (Resolves Hook Rule issues) ---
 interface HeatmapRowProps {
   row: number;
-  scrollYProgress: any;
+  scrollYProgress: MotionValue<number>;
 }
 
 function HeatmapRow({ row, scrollYProgress }: HeatmapRowProps) {
@@ -377,36 +379,11 @@ export default function Home() {
     });
   }, [streakCountTransform]);
 
-  // Socratic Solver steps calculation
-  const [solverStep, setSolverStep] = useState(0);
-  useEffect(() => {
-    if (scrollVal >= 0.52 && scrollVal < 0.78) {
-      const step = Math.min(Math.floor((scrollVal - 0.52) / 0.04), 5);
-      setSolverStep(step);
-    } else {
-      setSolverStep(0);
-    }
-  }, [scrollVal]);
-
-  // Pomodoro Focus Timer State
-  const [timerSeconds, setTimerSeconds] = useState(1500); // 25 mins
-  const [timerRunning, setTimerRunning] = useState(false);
-
-  useEffect(() => {
-    let interval: any;
-    if (timerRunning && timerSeconds > 0) {
-      interval = setInterval(() => {
-        setTimerSeconds((prev) => (prev > 0 ? prev - 1 : 1500));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [timerRunning, timerSeconds]);
-
-  const formatTimer = (secs: number) => {
-    const mins = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${mins.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
+  // Socratic Solver steps calculation (derived from scroll position)
+  const solverStep =
+    scrollVal >= 0.52 && scrollVal < 0.78
+      ? Math.min(Math.floor((scrollVal - 0.52) / 0.04), 5)
+      : 0;
 
   // Copied math formula alert state
   const [isCopied, setIsCopied] = useState(false);
@@ -428,9 +405,10 @@ export default function Home() {
           y: (Math.random() - 0.5) * maxOffset
         });
       }, 55);
-      return () => clearInterval(interval);
-    } else {
-      setTimerJitter({ x: 0, y: 0 });
+      return () => {
+        clearInterval(interval);
+        setTimerJitter({ x: 0, y: 0 });
+      };
     }
   }, [scrollVal]);
 
@@ -528,7 +506,7 @@ export default function Home() {
         {/* --- HEADER --- */}
         <header className="absolute top-0 left-0 w-full z-50 p-8 flex items-center justify-between border-b border-white/5 bg-black/20 backdrop-blur-md">
           <div className="flex items-center space-x-2">
-            <img src="/logo.png" alt="FocusFlow Logo" className="w-6 h-6 rounded-md border border-white/10 shadow-lg object-cover" />
+            <Image src="/logo.png" alt="FocusFlow Logo" width={24} height={24} className="w-6 h-6 rounded-md border border-white/10 shadow-lg object-cover" />
             <span className="font-bold text-sm tracking-tight text-white font-mono">FocusFlow</span>
           </div>
           
@@ -749,7 +727,7 @@ export default function Home() {
 
                     {solverStep >= 2 && (
                       <div className="text-zinc-550 text-[10px]">
-                        // Step 1: Slice coordinate grid. R_eq = R + (R * R_eq) &divide; (R + R_eq)
+                        {"// Step 1: Slice coordinate grid. R_eq = R + (R * R_eq) \u00F7 (R + R_eq)"}
                       </div>
                     )}
 

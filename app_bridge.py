@@ -91,7 +91,9 @@ class FocusFlowAPI:
 
     def add_daily_goal(self, text: str) -> Dict[str, Any]:
         try:
-            return self._app.session_manager.add_daily_goal(text)
+            if not text or not str(text).strip():
+                return {}
+            return self._app.session_manager.add_daily_goal(str(text).strip())
         except Exception as e:
             self._logger.error(f"Error adding daily goal: {e}")
             return {}

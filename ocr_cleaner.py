@@ -259,7 +259,7 @@ class OCRCleaner:
 
         Heuristics
         ----------
-        * ``good``:  ≥ 80 % alphanumeric ratio *and* > 20 characters.
+        * ``good``:  ≥ 80 % valid character ratio *and* > 20 characters.
         * ``weak``:  50–80 % ratio *or* 10–20 characters.
         * ``poor``:  < 50 % ratio *or* < 10 characters.
         """
@@ -273,8 +273,10 @@ class OCRCleaner:
         if not non_ws:
             return "poor"
 
-        alnum = sum(1 for c in non_ws if c.isalnum())
-        ratio = alnum / len(non_ws)
+        # Count alphanumeric characters plus valid math, code, and punctuation symbols
+        valid_symbols = "+-*/=^√∫∂∆%±≤≥≠≈∝()[]{}<>,.;_:"
+        valid_count = sum(1 for c in non_ws if c.isalnum() or c in valid_symbols)
+        ratio = valid_count / len(non_ws)
 
         if length < 10 or ratio < 0.50:
             return "poor"

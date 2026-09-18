@@ -351,10 +351,13 @@ class SessionManager:
         return today_goals
 
     def add_daily_goal(self, text: str) -> Dict[str, Any]:
+        if not text or not str(text).strip():
+            return {}
+        clean_text = str(text).strip()
         today_str = date.today().strftime("%Y-%m-%d")
         new_goal = {
             "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
-            "text": text,
+            "text": clean_text,
             "completed": False,
             "date": today_str
         }

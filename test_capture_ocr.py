@@ -37,9 +37,14 @@ class TestCaptureOCR(unittest.TestCase):
     def test_ocr_extract_text_empty_image(self):
         blank = Image.new("RGB", (100, 100), color=(255, 255, 255))
         # OCR on blank image should succeed and return empty or string, without crashing
-        text, err = self.ocr.extract_text(blank)
-        self.assertIsInstance(text, str)
-        self.assertIsNone(err)
+        if self.ocr.is_ready():
+            text, err = self.ocr.extract_text(blank)
+            self.assertIsInstance(text, str)
+            self.assertIsNone(err)
+        else:
+            text, err = self.ocr.extract_text(blank)
+            self.assertEqual(text, "")
+            self.assertEqual(err, "Tesseract is not available.")
 
 
 if __name__ == "__main__":

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Zap, Monitor, Clock, Target, Shield, Sparkles, BookOpen, Flame,
-  Play, Pause, SkipForward, ChevronRight, Settings, BarChart2,
-  HelpCircle, CheckSquare, Plus, Trash2, Volume2, Music, Check,
-  AlertTriangle, LogOut, FileText, Folder, Eye, Moon, Compass, Code, Terminal
+  Zap, Monitor, Clock, Shield, Sparkles, BookOpen,
+  Play, Pause, SkipForward, Settings, BarChart2,
+  Plus, Trash2, Check,
+  AlertTriangle, LogOut, FileText, Folder, Compass, Code, Terminal
 } from "lucide-react";
 
 // --- Types & Schema Definitions ---
@@ -30,6 +30,40 @@ interface Goal {
   date: string;
 }
 
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlocked: boolean;
+}
+
+interface Stats {
+  total_hours: number;
+  streak: number;
+  avg_focus_score: number;
+  sessions_count: number;
+  tasks_completed?: number;
+  weekly_data: number[];
+  subject_distribution: Record<string, number>;
+  hourly_productivity: number[];
+  achievements: Achievement[];
+  recent_sessions: Session[];
+}
+
+interface ActiveSession {
+  goal: string;
+  subject: string;
+  mode: string;
+  target_duration_mins: number;
+  start_time: string;
+  custom_features?: {
+    coding_sandbox?: boolean;
+    chosen_coding_app?: string;
+    [key: string]: unknown;
+  };
+}
+
 interface AppSettings {
   hotkey_solve: string;
   capture_mode: string;
@@ -43,9 +77,86 @@ interface AppSettings {
   llm_model_path?: string;
 }
 
+declare global {
+  interface Window {
+    pywebview?: {
+      api?: {
+        get_stats?: () => Promise<Stats>;
+        get_daily_goals?: () => Promise<Goal[]>;
+        get_settings?: () => Promise<AppSettings>;
+        get_active_session?: () => Promise<ActiveSession | null>;
+        start_focus_session?: (
+          goal: string,
+          subject: string,
+          duration: number,
+          mode: string,
+          features: Record<string, unknown>
+        ) => Promise<boolean>;
+        stop_focus_session?: (status: string) => Promise<boolean>;
+        open_model_selector?: () => Promise<string>;
+        save_settings?: (settings: AppSettings) => Promise<boolean>;
+        trigger_ocr_capture?: () => Promise<void>;
+        open_pdf_selector?: () => Promise<string>;
+        open_file_explorer?: () => Promise<void>;
+        run_code?: (lang: string, code: string) => Promise<{ exit_code: number; stdout: string; stderr: string }>;
+        on_ai_panel_visibility_changed?: (visible: boolean) => Promise<void>;
+        add_daily_goal?: (text: string) => Promise<Goal>;
+        toggle_daily_goal?: (id: string) => Promise<Goal[]>;
+        delete_daily_goal?: (id: string) => Promise<Goal[]>;
+        query_ai_assistant?: (prompt: string, tool: string, context?: unknown) => Promise<string>;
+        spotify_action?: (action: string) => Promise<void>;
+        minimize_window?: () => void;
+        close_window?: () => void;
+      };
+    };
+    setOcrResult?: (text: string) => void;
+    showBlockedAlert?: (appName: string) => void;
+    loadPdfInApp?: (path: string) => void;
+    stopSessionFromPython?: (status: string) => void;
+  }
+}
+
+const getDefaultFeaturesForMode = (mode: string): Record<string, boolean> => {
+  if (mode === "very_strict") {
+    return {
+      keyboard_lock: true,
+      touchpad_lock: true,
+      app_sweeper: true,
+      foreground_guard: true,
+      fullscreen: true,
+      capture_protection: true,
+    };
+  } else if (mode === "strict") {
+    return {
+      keyboard_lock: true,
+      touchpad_lock: true,
+      app_sweeper: true,
+      foreground_guard: true,
+      fullscreen: false,
+      capture_protection: true,
+    };
+  } else if (mode === "moderate") {
+    return {
+      keyboard_lock: true,
+      touchpad_lock: false,
+      app_sweeper: false,
+      foreground_guard: true,
+      fullscreen: false,
+      capture_protection: true,
+    };
+  }
+  return {
+    keyboard_lock: false,
+    touchpad_lock: false,
+    app_sweeper: false,
+    foreground_guard: false,
+    fullscreen: false,
+    capture_protection: false,
+  };
+};
+
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<string>("desktop");
-  const [hoverTimer, setHoverTimer] = useState<boolean>(false);
   const [isWebviewReady, setIsWebviewReady] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
 
@@ -61,19 +172,19 @@ export default function DashboardPage() {
   }, [toast]);
   
   const handleMinimize = () => {
-    if (typeof window !== "undefined" && (window as any).pywebview?.api?.minimize_window) {
-      (window as any).pywebview.api.minimize_window();
+    if (typeof window !== "undefined" && window.pywebview?.api?.minimize_window) {
+      window.pywebview.api.minimize_window();
     }
   };
 
   const handleClose = () => {
-    if (typeof window !== "undefined" && (window as any).pywebview?.api?.close_window) {
-      (window as any).pywebview.api.close_window();
+    if (typeof window !== "undefined" && window.pywebview?.api?.close_window) {
+      window.pywebview.api.close_window();
     }
   };
   
   // --- Core States ---
-  const [stats, setStats] = useState<any>({
+  const [stats, setStats] = useState<Stats>({
     total_hours: 0.0,
     streak: 0,
     avg_focus_score: 0,
@@ -109,14 +220,14 @@ export default function DashboardPage() {
   const [chosenCodingApp, setChosenCodingApp] = useState<string>("Code.exe");
   const [customCodingAppText, setCustomCodingAppText] = useState<string>("");
   const [pdfUrl, setPdfUrl] = useState<string>("");
-  const [customFeatures, setCustomFeatures] = useState({
-    keyboard_lock: false,
-    touchpad_lock: false,
-    app_sweeper: false,
-    foreground_guard: false,
-    fullscreen: false,
-    capture_protection: true,
-  });
+  const [customFeatures, setCustomFeatures] = useState<Record<string, boolean>>(() =>
+    getDefaultFeaturesForMode("light")
+  );
+
+  const handleSelectMode = (modeId: string) => {
+    setSessionMode(modeId);
+    setCustomFeatures(getDefaultFeaturesForMode(modeId));
+  };
 
   useEffect(() => {
     sessionPausedRef.current = sessionPaused;
@@ -137,46 +248,6 @@ export default function DashboardPage() {
     }
     return false;
   };
-
-  useEffect(() => {
-    if (sessionMode === "very_strict") {
-      setCustomFeatures({
-        keyboard_lock: true,
-        touchpad_lock: true,
-        app_sweeper: true,
-        foreground_guard: true,
-        fullscreen: true,
-        capture_protection: true,
-      });
-    } else if (sessionMode === "strict") {
-      setCustomFeatures({
-        keyboard_lock: true,
-        touchpad_lock: true,
-        app_sweeper: true,
-        foreground_guard: true,
-        fullscreen: false,
-        capture_protection: true,
-      });
-    } else if (sessionMode === "moderate") {
-      setCustomFeatures({
-        keyboard_lock: true,
-        touchpad_lock: false,
-        app_sweeper: false,
-        foreground_guard: true,
-        fullscreen: false,
-        capture_protection: true,
-      });
-    } else {
-      setCustomFeatures({
-        keyboard_lock: false,
-        touchpad_lock: false,
-        app_sweeper: false,
-        foreground_guard: false,
-        fullscreen: false,
-        capture_protection: false,
-      });
-    }
-  }, [sessionMode]);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [targetTime, setTargetTime] = useState<number>(0);
   const [exitHoldProgress, setExitHoldProgress] = useState<number>(0);
@@ -205,7 +276,7 @@ export default function DashboardPage() {
       }, 15000); // 15 seconds
       return () => clearInterval(interval);
     }
-  }, [sessionActive, sessionMode]);
+  }, [sessionActive, sessionMode, quotes.length]);
 
   // Disable multi-touch gestures (zoom/pinch/multi-finger scrolls) in WebView under Strict modes
   useEffect(() => {
@@ -252,26 +323,130 @@ export default function DashboardPage() {
   const exitHoldRef = useRef<NodeJS.Timeout | null>(null);
   const isStoppingLocallyRef = useRef<boolean>(false);
 
+  // --- Session Timer & Data Helpers ---
+  const resetSessionInputs = useCallback(() => {
+    setSessionGoal("");
+    setTimeLeft(0);
+    setTargetTime(0);
+    setExitHoldProgress(0);
+    setShowExitWarning(false);
+  }, []);
+
+  const startTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      if (sessionPausedRef.current) return;
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+  }, []);
+
+  const loadMockData = useCallback(() => {
+    setStats({
+      total_hours: 14.5,
+      streak: 3,
+      avg_focus_score: 88,
+      sessions_count: 12,
+      weekly_data: [1.2, 2.5, 0.0, 3.1, 2.0, 4.2, 1.5],
+      subject_distribution: {
+        "Physics": 360,
+        "Maths": 240,
+        "Chemistry": 180,
+        "Computer Science": 90
+      },
+      hourly_productivity: [0,0,0,0,0,0,10,25,40,30,0,0,15,45,60,10,0,0,20,50,30,10,0,0],
+      achievements: [
+        { id: "first_step", title: "First Step", description: "Complete your first focus session", icon: "Zap", unlocked: true },
+        { id: "deep_diver", title: "Deep Diver", description: "Complete a 60+ minute session in Strict", icon: "Shield", unlocked: true },
+        { id: "unstoppable", title: "Unstoppable", description: "Reach a 3-day focus streak", icon: "Flame", unlocked: true },
+        { id: "academic_weapon", title: "Academic Weapon", description: "Study for 10+ hours", icon: "BookOpen", unlocked: true },
+        { id: "early_bird", title: "Early Bird", description: "Study before 8:00 AM", icon: "Clock", unlocked: false },
+        { id: "night_owl", title: "Night Owl", description: "Study after 10:00 PM", icon: "Moon", unlocked: false }
+      ],
+      recent_sessions: [
+        { id: "1", timestamp: "2026-06-12 18:30:00", goal: "Solve 20 Electromagnetism Questions", subject: "Physics", duration_mins: 45, target_duration_mins: 45, mode: "strict", status: "completed", focus_score: 95, is_interrupted: false },
+        { id: "2", timestamp: "2026-06-12 14:00:00", goal: "Read Alcohol Phenol Ether Notes", subject: "Chemistry", duration_mins: 30, target_duration_mins: 30, mode: "moderate", status: "completed", focus_score: 90, is_interrupted: false },
+        { id: "3", timestamp: "2026-06-11 19:15:00", goal: "Solve Calculus Integration Sheet", subject: "Maths", duration_mins: 60, target_duration_mins: 60, mode: "very_strict", status: "completed", focus_score: 100, is_interrupted: false }
+      ]
+    });
+    setGoals([
+      { id: "1", text: "Complete Physics Chapter 3 Formulas", completed: true, date: "2026-06-13" },
+      { id: "2", text: "Revise Inorganic Reactions", completed: false, date: "2026-06-13" },
+      { id: "3", text: "Solve 15 Limits problems", completed: false, date: "2026-06-13" }
+    ]);
+  }, []);
+
+  const loadDataFromPython = useCallback(async () => {
+    if (typeof window === "undefined" || !window.pywebview?.api) return;
+    const api = window.pywebview.api;
+    try {
+      if (api.get_stats) {
+        const pStats = await api.get_stats();
+        if (pStats) setStats(pStats);
+      }
+      
+      if (api.get_daily_goals) {
+        const pGoals = await api.get_daily_goals();
+        if (pGoals) setGoals(pGoals);
+      }
+      
+      if (api.get_settings) {
+        const pSettings = await api.get_settings();
+        if (pSettings) setSettings(pSettings);
+      }
+
+      if (api.get_active_session) {
+        const activeSession = await api.get_active_session();
+        if (activeSession) {
+          // Crash Recovery: Resume session!
+          setSessionActive(true);
+          setSessionGoal(activeSession.goal);
+          setSessionSubject(activeSession.subject);
+          setSessionMode(activeSession.mode);
+          setSessionDuration(activeSession.target_duration_mins);
+          if (activeSession.custom_features?.coding_sandbox) {
+            setEnableCodingSandbox(true);
+          }
+          if (activeSession.custom_features) {
+            setCustomFeatures(activeSession.custom_features as Record<string, boolean>);
+          } else {
+            setCustomFeatures(getDefaultFeaturesForMode(activeSession.mode));
+          }
+          
+          // Calculate remaining seconds safely supporting ISO and space-separated date formats
+          const rawStartTime = activeSession.start_time;
+          const normalizedStartTime = typeof rawStartTime === "string"
+            ? rawStartTime.replace(" ", "T")
+            : rawStartTime;
+          const parsedStart = new Date(normalizedStartTime).getTime();
+          const start = isNaN(parsedStart) ? Date.now() : parsedStart;
+          const now = Date.now();
+          const elapsedSeconds = Math.max(0, Math.floor((now - start) / 1000));
+          const totalSeconds = (activeSession.target_duration_mins || 25) * 60;
+          const left = Math.max(0, totalSeconds - elapsedSeconds);
+          
+          setTimeLeft(left);
+          setTargetTime(totalSeconds);
+          setActiveTab("session");
+          startTimer();
+        }
+      }
+    } catch (e: unknown) {
+      console.error("Error loading data from Python API: ", e);
+    }
+  }, [startTimer]);
+
   // --- Detect Webview Bridge ---
   useEffect(() => {
     let initialized = false;
-    let timer1: NodeJS.Timeout;
-    let timer2: NodeJS.Timeout;
-    let timer3: NodeJS.Timeout;
-    let fallbackTimer: NodeJS.Timeout;
+    const timers: NodeJS.Timeout[] = [];
 
     const checkBridge = () => {
       if (initialized) return;
-      if (typeof window !== "undefined" && (window as any).pywebview && (window as any).pywebview.api) {
+      if (typeof window !== "undefined" && window.pywebview?.api) {
         initialized = true;
         setIsWebviewReady(true);
         loadDataFromPython();
-        
-        // Clear all timers immediately to prevent duplicate runs
-        clearTimeout(timer1);
-        clearTimeout(timer2);
-        clearTimeout(timer3);
-        clearTimeout(fallbackTimer);
+        timers.forEach(clearTimeout);
       }
     };
 
@@ -280,38 +455,38 @@ export default function DashboardPage() {
     }
     
     // Check multiple times to handle async initialization
-    timer1 = setTimeout(checkBridge, 100);
-    timer2 = setTimeout(checkBridge, 500);
-    timer3 = setTimeout(checkBridge, 1500);
+    timers.push(setTimeout(checkBridge, 100));
+    timers.push(setTimeout(checkBridge, 500));
+    timers.push(setTimeout(checkBridge, 1500));
 
-    fallbackTimer = setTimeout(() => {
+    timers.push(setTimeout(() => {
       if (!initialized) {
         // Fallback for regular web browsers
         loadMockData();
       }
-    }, 2000);
+    }, 2000));
 
     // Set up global callback for OCR Screen Capture responses
-    (window as any).setOcrResult = (text: string) => {
+    window.setOcrResult = (text: string) => {
       setAiInput((prev) => prev ? `${prev}\n\n${text}` : text);
       setActiveTab("ai");
       setAiChat((prev) => [...prev, { role: "system", text: "Successfully captured screen region and processed OCR." }]);
     };
     
     // Set up alert fallback
-    (window as any).showBlockedAlert = (appName: string) => {
+    window.showBlockedAlert = (appName: string) => {
       showToast(`Access Blocked: "${appName}" is restricted in this Focus Mode!`, "error");
     };
 
     // Set up PDF loader inside WebView
-    (window as any).loadPdfInApp = (path: string) => {
+    window.loadPdfInApp = (path: string) => {
       setPdfUrl(path);
       setSessionTab("pdf");
       showToast("PDF loaded inside application viewport!", "success");
     };
 
     // Set up native stop callback
-    (window as any).stopSessionFromPython = (status: string) => {
+    window.stopSessionFromPython = (status: string) => {
       if (isStoppingLocallyRef.current) {
         isStoppingLocallyRef.current = false;
         return;
@@ -337,17 +512,14 @@ export default function DashboardPage() {
       if (typeof window !== "undefined") {
         window.removeEventListener("pywebviewready", checkBridge);
       }
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-      clearTimeout(fallbackTimer);
+      timers.forEach(clearTimeout);
       if (timerRef.current) clearInterval(timerRef.current);
-      delete (window as any).stopSessionFromPython;
-      delete (window as any).loadPdfInApp;
-      delete (window as any).setOcrResult;
-      delete (window as any).showBlockedAlert;
+      delete window.stopSessionFromPython;
+      delete window.loadPdfInApp;
+      delete window.setOcrResult;
+      delete window.showBlockedAlert;
     };
-  }, []);
+  }, [loadDataFromPython, loadMockData, resetSessionInputs]);
 
   // --- Audio Effects Hooks ---
   useEffect(() => {
@@ -398,94 +570,10 @@ export default function DashboardPage() {
   // --- Track AI Panel Visibility to start/stop offline LLM server ---
   useEffect(() => {
     const isAiVisible = sessionActive ? (sessionTab === "ai") : (activeTab === "ai");
-    if (typeof window !== "undefined" && (window as any).pywebview?.api?.on_ai_panel_visibility_changed) {
-      (window as any).pywebview.api.on_ai_panel_visibility_changed(isAiVisible);
+    if (typeof window !== "undefined" && window.pywebview?.api?.on_ai_panel_visibility_changed) {
+      window.pywebview.api.on_ai_panel_visibility_changed(isAiVisible);
     }
   }, [activeTab, sessionTab, sessionActive]);
-
-  // --- Load API Data ---
-  const loadDataFromPython = async () => {
-    if (typeof window === "undefined" || !(window as any).pywebview?.api) return;
-    const api = (window as any).pywebview.api;
-    try {
-      const pStats = await api.get_stats();
-      if (pStats) setStats(pStats);
-      
-      const pGoals = await api.get_daily_goals();
-      if (pGoals) setGoals(pGoals);
-      
-      const pSettings = await api.get_settings();
-      if (pSettings) setSettings(pSettings);
-
-      const activeSession = await api.get_active_session();
-      if (activeSession) {
-        // Crash Recovery: Resume session!
-        setSessionActive(true);
-        setSessionGoal(activeSession.goal);
-        setSessionSubject(activeSession.subject);
-        setSessionMode(activeSession.mode);
-        setSessionDuration(activeSession.target_duration_mins);
-        if (activeSession.custom_features?.coding_sandbox) {
-          setEnableCodingSandbox(true);
-        }
-        
-        // Calculate remaining seconds safely supporting ISO and space-separated date formats
-        const rawStartTime = activeSession.start_time;
-        const normalizedStartTime = typeof rawStartTime === "string"
-          ? rawStartTime.replace(" ", "T")
-          : rawStartTime;
-        const parsedStart = new Date(normalizedStartTime).getTime();
-        const start = isNaN(parsedStart) ? Date.now() : parsedStart;
-        const now = Date.now();
-        const elapsedSeconds = Math.max(0, Math.floor((now - start) / 1000));
-        const totalSeconds = (activeSession.target_duration_mins || 25) * 60;
-        const left = Math.max(0, totalSeconds - elapsedSeconds);
-        
-        setTimeLeft(left);
-        setTargetTime(totalSeconds);
-        setActiveTab("session");
-        startTimer();
-
-      }
-    } catch (e: any) {
-      console.error("Error loading data from Python API: ", e);
-    }
-  };
-
-  const loadMockData = () => {
-    setStats({
-      total_hours: 14.5,
-      streak: 3,
-      avg_focus_score: 88,
-      sessions_count: 12,
-      weekly_data: [1.2, 2.5, 0.0, 3.1, 2.0, 4.2, 1.5],
-      subject_distribution: {
-        "Physics": 360,
-        "Maths": 240,
-        "Chemistry": 180,
-        "Computer Science": 90
-      },
-      hourly_productivity: [0,0,0,0,0,0,10,25,40,30,0,0,15,45,60,10,0,0,20,50,30,10,0,0],
-      achievements: [
-        { id: "first_step", title: "First Step", description: "Complete your first focus session", icon: "Zap", unlocked: true },
-        { id: "deep_diver", title: "Deep Diver", description: "Complete a 60+ minute session in Strict", icon: "Shield", unlocked: true },
-        { id: "unstoppable", title: "Unstoppable", description: "Reach a 3-day focus streak", icon: "Flame", unlocked: true },
-        { id: "academic_weapon", title: "Academic Weapon", description: "Study for 10+ hours", icon: "BookOpen", unlocked: true },
-        { id: "early_bird", title: "Early Bird", description: "Study before 8:00 AM", icon: "Clock", unlocked: false },
-        { id: "night_owl", title: "Night Owl", description: "Study after 10:00 PM", icon: "Moon", unlocked: false }
-      ],
-      recent_sessions: [
-        { id: "1", timestamp: "2026-06-12 18:30:00", goal: "Solve 20 Electromagnetism Questions", subject: "Physics", duration_mins: 45, target_duration_mins: 45, mode: "strict", status: "completed", focus_score: 95, is_interrupted: false },
-        { id: "2", timestamp: "2026-06-12 14:00:00", goal: "Read Alcohol Phenol Ether Notes", subject: "Chemistry", duration_mins: 30, target_duration_mins: 30, mode: "moderate", status: "completed", focus_score: 90, is_interrupted: false },
-        { id: "3", timestamp: "2026-06-11 19:15:00", goal: "Solve Calculus Integration Sheet", subject: "Maths", duration_mins: 60, target_duration_mins: 60, mode: "very_strict", status: "completed", focus_score: 100, is_interrupted: false }
-      ]
-    });
-    setGoals([
-      { id: "1", text: "Complete Physics Chapter 3 Formulas", completed: true, date: "2026-06-13" },
-      { id: "2", text: "Revise Inorganic Reactions", completed: false, date: "2026-06-13" },
-      { id: "3", text: "Solve 15 Limits problems", completed: false, date: "2026-06-13" }
-    ]);
-  };
 
   // --- Session Control Handlers ---
   const handleStartSession = async () => {
@@ -501,15 +589,14 @@ export default function DashboardPage() {
     setSessionPaused(false);
     setActiveTab("session");
     
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
+    if (isWebviewReady && window.pywebview?.api?.start_focus_session) {
       const activeCodingApp = chosenCodingApp === "custom" ? customCodingAppText.trim() : chosenCodingApp;
       const featuresToSend = {
         ...customFeatures,
         coding_sandbox: enableCodingSandbox,
         chosen_coding_app: activeCodingApp
       };
-      await api.start_focus_session(sessionGoal, sessionSubject, sessionDuration, sessionMode, featuresToSend);
+      await window.pywebview.api.start_focus_session(sessionGoal, sessionSubject, sessionDuration, sessionMode, featuresToSend);
     }
     
     startTimer();
@@ -539,8 +626,8 @@ export default function DashboardPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       showToast(`Saved script successfully!`, "success");
-    } catch (e: any) {
-      showToast(`Failed to save script: ${e.message}`, "error");
+    } catch (e: unknown) {
+      showToast(`Failed to save script: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   };
 
@@ -559,17 +646,16 @@ export default function DashboardPage() {
         const fn = new Function(sandboxCode);
         fn();
         setSandboxOutput(output || "Code executed successfully with no output.\n");
-      } catch (err: any) {
-        setSandboxOutput(output + `Execution Error: ${err.message}\n`);
+      } catch (err: unknown) {
+        setSandboxOutput(output + `Execution Error: ${err instanceof Error ? err.message : String(err)}\n`);
       } finally {
         console.log = originalLog;
         setSandboxRunning(false);
       }
     } else if (sandboxLang === "python") {
       try {
-        if (typeof window !== "undefined" && (window as any).pywebview?.api?.run_code) {
-          const api = (window as any).pywebview.api;
-          const res = await api.run_code("python", sandboxCode);
+        if (typeof window !== "undefined" && window.pywebview?.api?.run_code) {
+          const res = await window.pywebview.api.run_code("python", sandboxCode);
           if (res.exit_code === 0) {
             setSandboxOutput(res.stdout || "Code executed successfully with no output.\n");
           } else {
@@ -581,8 +667,8 @@ export default function DashboardPage() {
         } else {
           setSandboxOutput("Python execution not available: WebView API bridge missing.\n");
         }
-      } catch (err: any) {
-        setSandboxOutput(`Execution failed: ${err.message}\n`);
+      } catch (err: unknown) {
+        setSandboxOutput(`Execution failed: ${err instanceof Error ? err.message : String(err)}\n`);
       } finally {
         setSandboxRunning(false);
       }
@@ -590,14 +676,6 @@ export default function DashboardPage() {
       setSandboxOutput("HTML Preview loaded.\n");
       setSandboxRunning(false);
     }
-  };
-
-  const startTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      if (sessionPausedRef.current) return;
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
   };
 
   const handleStopSession = async (explicitStatus?: string) => {
@@ -619,11 +697,10 @@ export default function DashboardPage() {
     const elapsedMins = Math.max(1, Math.ceil(elapsedSecs / 60));
     const targetMins = Math.ceil(targetTime / 60);
 
-    let status = explicitStatus || "completed";
+    const status = explicitStatus || "completed";
 
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
-      await api.stop_focus_session(status);
+    if (isWebviewReady && window.pywebview?.api?.stop_focus_session) {
+      await window.pywebview.api.stop_focus_session(status);
       loadDataFromPython();
     } else {
       const newSess: Session = {
@@ -638,7 +715,7 @@ export default function DashboardPage() {
         focus_score: status === "completed" ? 95 : status === "partially_completed" ? 60 : 0,
         is_interrupted: status === "interrupted"
       };
-      setStats((prev: any) => ({
+      setStats((prev: Stats) => ({
         ...prev,
         sessions_count: prev.sessions_count + 1,
         total_hours: Number((prev.total_hours + newSess.duration_mins / 60).toFixed(1)),
@@ -664,13 +741,13 @@ export default function DashboardPage() {
   };
 
   const handleBrowseModel = async () => {
-    if (typeof window !== "undefined" && (window as any).pywebview?.api?.open_model_selector) {
-      const path = await (window as any).pywebview.api.open_model_selector();
+    if (typeof window !== "undefined" && window.pywebview?.api?.open_model_selector) {
+      const path = await window.pywebview.api.open_model_selector();
       if (path) {
         const newSettings = { ...settings, llm_model_path: path };
         setSettings(newSettings);
-        if (isWebviewReady) {
-          (window as any).pywebview.api.save_settings(newSettings);
+        if (isWebviewReady && window.pywebview?.api?.save_settings) {
+          window.pywebview.api.save_settings(newSettings);
         }
         showToast(`Integrated custom model: ${path.split('\\').pop()}`, "success");
       }
@@ -682,8 +759,8 @@ export default function DashboardPage() {
     const updated = [...(settings.moderate_allowed_apps || []), newAppInput.trim()];
     const newSettings = { ...settings, moderate_allowed_apps: updated };
     setSettings(newSettings);
-    if (isWebviewReady) {
-      (window as any).pywebview.api.save_settings(newSettings);
+    if (isWebviewReady && window.pywebview?.api?.save_settings) {
+      window.pywebview.api.save_settings(newSettings);
     }
     setNewAppInput("");
   };
@@ -692,8 +769,8 @@ export default function DashboardPage() {
     const updated = (settings.moderate_allowed_apps || []).filter((a) => a !== app);
     const newSettings = { ...settings, moderate_allowed_apps: updated };
     setSettings(newSettings);
-    if (isWebviewReady) {
-      (window as any).pywebview.api.save_settings(newSettings);
+    if (isWebviewReady && window.pywebview?.api?.save_settings) {
+      window.pywebview.api.save_settings(newSettings);
     }
   };
 
@@ -702,8 +779,8 @@ export default function DashboardPage() {
     const updated = [...(settings.moderate_allowed_websites || []), newSiteInput.trim()];
     const newSettings = { ...settings, moderate_allowed_websites: updated };
     setSettings(newSettings);
-    if (isWebviewReady) {
-      (window as any).pywebview.api.save_settings(newSettings);
+    if (isWebviewReady && window.pywebview?.api?.save_settings) {
+      window.pywebview.api.save_settings(newSettings);
     }
     setNewSiteInput("");
   };
@@ -712,17 +789,9 @@ export default function DashboardPage() {
     const updated = (settings.moderate_allowed_websites || []).filter((s) => s !== site);
     const newSettings = { ...settings, moderate_allowed_websites: updated };
     setSettings(newSettings);
-    if (isWebviewReady) {
-      (window as any).pywebview.api.save_settings(newSettings);
+    if (isWebviewReady && window.pywebview?.api?.save_settings) {
+      window.pywebview.api.save_settings(newSettings);
     }
-  };
-
-  const resetSessionInputs = () => {
-    setSessionGoal("");
-    setTimeLeft(0);
-    setTargetTime(0);
-    setExitHoldProgress(0);
-    setShowExitWarning(false);
   };
 
   // --- Exit Button Holding Progress ---
@@ -763,9 +832,8 @@ export default function DashboardPage() {
   // --- Goals Interaction ---
   const handleAddGoal = async () => {
     if (!newGoalText.trim()) return;
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
-      const created = await api.add_daily_goal(newGoalText);
+    if (isWebviewReady && window.pywebview?.api?.add_daily_goal) {
+      const created = await window.pywebview.api.add_daily_goal(newGoalText);
       setGoals((prev) => [...prev, created]);
     } else {
       const newGoal: Goal = {
@@ -780,9 +848,8 @@ export default function DashboardPage() {
   };
 
   const handleToggleGoal = async (id: string) => {
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
-      await api.toggle_daily_goal(id);
+    if (isWebviewReady && window.pywebview?.api?.toggle_daily_goal) {
+      await window.pywebview.api.toggle_daily_goal(id);
       loadDataFromPython();
     } else {
       setGoals((prev) =>
@@ -792,9 +859,8 @@ export default function DashboardPage() {
   };
 
   const handleDeleteGoal = async (id: string) => {
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
-      await api.delete_daily_goal(id);
+    if (isWebviewReady && window.pywebview?.api?.delete_daily_goal) {
+      await window.pywebview.api.delete_daily_goal(id);
       loadDataFromPython();
     } else {
       setGoals((prev) => prev.filter((g) => g.id !== id));
@@ -810,9 +876,8 @@ export default function DashboardPage() {
     const currentInput = aiInput;
     setAiInput("");
 
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
-      const answer = await api.query_ai_assistant(currentInput, aiTool, null);
+    if (isWebviewReady && window.pywebview?.api?.query_ai_assistant) {
+      const answer = await window.pywebview.api.query_ai_assistant(currentInput, aiTool, null);
       setAiChat((prev) => [...prev, { role: "assistant", text: answer }]);
     } else {
       // Mock Response
@@ -832,10 +897,9 @@ export default function DashboardPage() {
   };
 
   const handleTriggerScreenCapture = async () => {
-    if (isWebviewReady) {
+    if (isWebviewReady && window.pywebview?.api?.trigger_ocr_capture) {
       setAiChat((prev) => [...prev, { role: "system", text: "Minimizing dashboard window to capture screen region... Please click and drag over the question." }]);
-      const api = (window as any).pywebview.api;
-      await api.trigger_ocr_capture();
+      await window.pywebview.api.trigger_ocr_capture();
     } else {
       showToast("Screen Capture is only available in the desktop application mode!", "error");
     }
@@ -844,27 +908,24 @@ export default function DashboardPage() {
   // --- Media Keys controls ---
   const handleSpotifyControl = async (action: string) => {
     if (action === "play_pause") setSpotifyPlaying(!spotifyPlaying);
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
-      await api.spotify_action(action);
+    if (isWebviewReady && window.pywebview?.api?.spotify_action) {
+      await window.pywebview.api.spotify_action(action);
     } else {
       console.log(`Mock Spotify command: ${action}`);
     }
   };
 
   const handlePDFOpen = async () => {
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
-      await api.open_pdf_selector();
+    if (isWebviewReady && window.pywebview?.api?.open_pdf_selector) {
+      await window.pywebview.api.open_pdf_selector();
     } else {
       showToast("File explorer access is only available in the desktop app!", "error");
     }
   };
 
   const handleExplorerOpen = async () => {
-    if (isWebviewReady) {
-      const api = (window as any).pywebview.api;
-      await api.open_file_explorer();
+    if (isWebviewReady && window.pywebview?.api?.open_file_explorer) {
+      await window.pywebview.api.open_file_explorer();
     } else {
       showToast("File explorer is only available in desktop mode!", "error");
     }
@@ -1088,7 +1149,7 @@ export default function DashboardPage() {
                         transition={{ duration: 0.5 }}
                         className="text-[11px] text-zinc-350 italic max-w-[190px] leading-relaxed font-light"
                       >
-                        "{quotes[currentQuoteIdx]}"
+                        &ldquo;{quotes[currentQuoteIdx]}&rdquo;
                       </motion.p>
                     </AnimatePresence>
                   </div>
@@ -1110,7 +1171,7 @@ export default function DashboardPage() {
               {/* Goal Title */}
               <div className="text-center space-y-1 max-w-md">
                 <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Active Study Goal</span>
-                <p className="text-lg font-medium text-zinc-250">"{sessionGoal}"</p>
+                <p className="text-lg font-medium text-zinc-250">&ldquo;{sessionGoal}&rdquo;</p>
               </div>
 
               {/* Media & Ambient controls (Only if not Very Strict) */}
@@ -1601,7 +1662,7 @@ export default function DashboardPage() {
               </div>
               <div className="p-3 bg-zinc-950/70 border border-zinc-900/50 rounded-xl text-center space-y-1">
                 <span className="text-[9px] text-zinc-500 font-mono block uppercase">Tasks Done</span>
-                <span className="text-lg font-black text-white">{stats.tasks_completed}</span>
+                <span className="text-lg font-black text-white">{stats.tasks_completed ?? goals.filter((g) => g.completed).length}</span>
               </div>
             </div>
 
@@ -1638,7 +1699,7 @@ export default function DashboardPage() {
           {/* Widget 2: Today's Focus Goals */}
           <div className="glass-panel p-6 rounded-2xl border border-zinc-800/40 bg-zinc-950 flex flex-col justify-between space-y-4 h-fit border-zinc-900/60 max-h-[320px]">
             <div className="flex items-center justify-between border-b border-zinc-900/40 pb-3">
-              <h3 className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase font-mono">Today's Focus Goals</h3>
+              <h3 className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase font-mono">Today&apos;s Focus Goals</h3>
               <Plus className="w-3.5 h-3.5 text-zinc-400 hover:text-white cursor-pointer" onClick={handleAddGoal} />
             </div>
 
@@ -1865,7 +1926,7 @@ export default function DashboardPage() {
                       ].map((m) => (
                         <button
                           key={m.id}
-                          onClick={() => setSessionMode(m.id)}
+                          onClick={() => handleSelectMode(m.id)}
                           type="button"
                           className={`p-2.5 text-xs rounded-lg border transition-all text-center ${
                             sessionMode === m.id
@@ -2041,7 +2102,7 @@ export default function DashboardPage() {
                         transition={{ duration: 0.5 }}
                         className="text-[11px] text-zinc-400 italic max-w-[190px] leading-relaxed"
                       >
-                        "{quotes[currentQuoteIdx]}"
+                        &ldquo;{quotes[currentQuoteIdx]}&rdquo;
                       </motion.p>
                     </AnimatePresence>
                   </div>
@@ -2061,7 +2122,7 @@ export default function DashboardPage() {
               {/* Goal Title */}
               <div className="text-center space-y-1 max-w-md">
                 <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Active Study Goal</span>
-                <p className="text-lg font-medium text-zinc-200">"{sessionGoal}"</p>
+                <p className="text-lg font-medium text-zinc-200">&ldquo;{sessionGoal}&rdquo;</p>
               </div>
 
               {/* Media Deck & Control Console */}
@@ -2353,8 +2414,8 @@ export default function DashboardPage() {
                     <p className="text-zinc-600 text-xs text-center py-12">Log study sessions to see distribution</p>
                   ) : (
                     <div className="space-y-3">
-                      {Object.entries(stats.subject_distribution).map(([subj, mins]: [string, any]) => {
-                        const totalMins = Object.values(stats.subject_distribution).reduce((a: any, b: any) => a + b, 0) as number;
+                      {Object.entries(stats.subject_distribution).map(([subj, mins]) => {
+                        const totalMins = Object.values(stats.subject_distribution).reduce((a: number, b: number) => a + b, 0);
                         const percent = totalMins > 0 ? Math.round((mins / totalMins) * 100) : 0;
                         return (
                           <div key={subj} className="space-y-1">
@@ -2380,7 +2441,7 @@ export default function DashboardPage() {
                     {stats.achievements.length === 0 ? (
                       <p className="text-zinc-600 text-xs text-center py-6 col-span-2">No achievements loaded.</p>
                     ) : (
-                      stats.achievements.map((ach: any) => (
+                      stats.achievements.map((ach: Achievement) => (
                         <div 
                           key={ach.id} 
                           className={`p-3 rounded-lg border flex items-center space-x-3 transition-colors ${
@@ -2428,7 +2489,7 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-950">
-                      {stats.recent_sessions.map((s: any) => (
+                      {stats.recent_sessions.map((s: Session) => (
                         <tr key={s.id} className="hover:bg-zinc-900/10">
                           <td className="py-2.5 text-zinc-500 font-mono">{s.timestamp}</td>
                           <td className="font-medium">{s.goal}</td>
@@ -2488,7 +2549,7 @@ export default function DashboardPage() {
                       const newOpacity = Number(e.target.value);
                       setSettings((prev) => ({ ...prev, opacity: newOpacity }));
                       if (isWebviewReady) {
-                        (window as any).pywebview.api.save_settings({ ...settings, opacity: newOpacity });
+                        window.pywebview?.api?.save_settings?.({ ...settings, opacity: newOpacity });
                       }
                     }}
                     className="w-full accent-purple-500 h-1 bg-zinc-950 rounded border border-zinc-900"
@@ -2514,7 +2575,7 @@ export default function DashboardPage() {
                         const newModel = e.target.value;
                         setSettings((prev) => ({ ...prev, online_model: newModel }));
                         if (isWebviewReady) {
-                          (window as any).pywebview.api.save_settings({ ...settings, online_model: newModel });
+                          window.pywebview?.api?.save_settings?.({ ...settings, online_model: newModel });
                         }
                       }}
                       className="w-full bg-zinc-950 border border-zinc-900 rounded-lg p-2.5 text-xs focus:outline-none focus:border-zinc-800"
@@ -2560,7 +2621,7 @@ export default function DashboardPage() {
                           <a href="https://huggingface.co/MaziyarPanahi/Meta-Llama-3-8B-Instruct-GGUF" target="_blank" className="text-purple-400 hover:text-purple-300 ml-1 underline">Download GGUF</a>
                         </li>
                       </ul>
-                      <p className="text-[10px] text-zinc-500 italic mt-2 font-mono">Tip: You can save models anywhere on your PC and click 'Browse GGUF' to integrate them. No manual copying required!</p>
+                      <p className="text-[10px] text-zinc-500 italic mt-2 font-mono">Tip: You can save models anywhere on your PC and click &apos;Browse GGUF&apos; to integrate them. No manual copying required!</p>
                     </div>
                   </div>
                 </div>
@@ -2763,7 +2824,7 @@ export default function DashboardPage() {
                   You are stopping the focus session before completing your target time. Did you complete your study goal?
                 </p>
                 <div className="bg-zinc-900/50 border border-zinc-900 p-2.5 rounded-lg text-[10px] text-zinc-500 font-mono italic">
-                  "{sessionGoal}"
+                  &ldquo;{sessionGoal}&rdquo;
                 </div>
               </div>
 

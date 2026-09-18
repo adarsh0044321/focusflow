@@ -43,7 +43,14 @@ class TestSessionManager(unittest.TestCase):
 
         # 3. Delete Goals
         success_del = self.session_mgr.delete_daily_goal(goal2["id"])
+        success_del_nonexistent = self.session_mgr.delete_daily_goal("nonexistent")
+        self.assertFalse(success_del_nonexistent)
         self.assertTrue(success_del)
+        self.assertEqual(len(self.session_mgr.get_daily_goals()), 1)
+
+        # 4. Reject Empty Goals
+        empty_goal = self.session_mgr.add_daily_goal("   ")
+        self.assertEqual(empty_goal, {})
         self.assertEqual(len(self.session_mgr.get_daily_goals()), 1)
 
     def test_focus_score_formula(self) -> None:
